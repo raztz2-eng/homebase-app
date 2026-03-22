@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import Kelly from "./Kelly.jsx";
+import Kelly    from "./Kelly.jsx";
 import Shopping from "./Shopping.jsx";
+import Tasks    from "./Tasks.jsx";
 
 const T = {
   he: {
@@ -51,8 +52,7 @@ const HEALTH_ITEMS = [
   {id:5,he:"מטפורמין",en:"Metformin",person:"Olga",daysLeft:6,type:"medication",refillAlert:true},
 ];
 
-// Pages that take full screen (no dashboard wrapper)
-const FULL_SCREEN_PAGES = ["kelly","shopping"];
+const FULL_SCREEN_PAGES = ["kelly","shopping","tasks"];
 
 export default function App() {
   const [lang,setLang]=useState("he");
@@ -77,16 +77,7 @@ export default function App() {
     <div style={{fontFamily:"'Outfit',sans-serif",background:"#0f1117",minHeight:"100vh",display:"flex",color:"#e8eaf0",direction:tr.dir}}>
       <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,background:"radial-gradient(ellipse 60% 40% at 20% 10%,rgba(99,102,241,.12) 0%,transparent 60%),radial-gradient(ellipse 50% 50% at 80% 80%,rgba(16,185,129,.08) 0%,transparent 60%)"}}/>
       {sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:40}}/>}
-
-      {/* Sidebar */}
-      <aside className={"sidebar"+(sidebarOpen?" open":"")} style={{
-        width:220,background:"rgba(17,19,30,.97)",
-        borderLeft:isRTL?"none":"1px solid rgba(255,255,255,.06)",
-        borderRight:isRTL?"1px solid rgba(255,255,255,.06)":"none",
-        display:"flex",flexDirection:"column",padding:"24px 0",
-        position:"fixed",top:0,bottom:0,[sidebarSide]:0,
-        zIndex:50,transition:"transform .3s ease",
-      }}>
+      <aside className={"sidebar"+(sidebarOpen?" open":"")} style={{width:220,background:"rgba(17,19,30,.97)",borderLeft:isRTL?"none":"1px solid rgba(255,255,255,.06)",borderRight:isRTL?"1px solid rgba(255,255,255,.06)":"none",display:"flex",flexDirection:"column",padding:"24px 0",position:"fixed",top:0,bottom:0,[sidebarSide]:0,zIndex:50,transition:"transform .3s ease"}}>
         <div style={{padding:"0 20px 28px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#6366f1,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏠</div>
@@ -95,15 +86,7 @@ export default function App() {
         </div>
         <nav style={{flex:1,padding:"16px 12px",display:"flex",flexDirection:"column",gap:2}}>
           {NAV_ITEMS.map(item=>{const active=activeNav===item.id;return(
-            <button key={item.id} onClick={()=>{setActiveNav(item.id);setSidebarOpen(false);}} style={{
-              display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,border:"none",
-              background:active?"rgba(99,102,241,.15)":"transparent",
-              color:active?"#a5b4fc":"#6b7280",cursor:"pointer",
-              textAlign:isRTL?"right":"left",width:"100%",fontSize:14,fontWeight:active?600:400,
-              borderRight:isRTL?(active?"2px solid #6366f1":"2px solid transparent"):"none",
-              borderLeft:isRTL?"none":(active?"2px solid #6366f1":"2px solid transparent"),
-              flexDirection:isRTL?"row-reverse":"row",
-            }}>
+            <button key={item.id} onClick={()=>{setActiveNav(item.id);setSidebarOpen(false);}} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,border:"none",background:active?"rgba(99,102,241,.15)":"transparent",color:active?"#a5b4fc":"#6b7280",cursor:"pointer",textAlign:isRTL?"right":"left",width:"100%",fontSize:14,fontWeight:active?600:400,borderRight:isRTL?(active?"2px solid #6366f1":"2px solid transparent"):"none",borderLeft:isRTL?"none":(active?"2px solid #6366f1":"2px solid transparent"),flexDirection:isRTL?"row-reverse":"row"}}>
               <span style={{fontSize:16}}>{item.icon}</span>
               <span style={{flex:1}}>{tr.nav[item.id]}</span>
               {item.id==="health"&&alerts.length>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:10,fontWeight:700,borderRadius:20,padding:"1px 6px"}}>{alerts.length}</span>}
@@ -122,15 +105,10 @@ export default function App() {
           </div>
         </div>
       </aside>
-
-      {/* Main */}
       <main className="main-content" style={{flex:1,...mainMargin,position:"relative",zIndex:1,minHeight:"100vh"}}>
-
-        {/* Full-screen pages */}
         {activeNav==="kelly"    && <Kelly    lang={lang}/>}
         {activeNav==="shopping" && <Shopping lang={lang}/>}
-
-        {/* Dashboard pages */}
+        {activeNav==="tasks"    && <Tasks    lang={lang}/>}
         {!isFullScreen && (
           <>
             <header style={{padding:"20px 32px",background:"rgba(15,17,23,.85)",backdropFilter:"blur(10px)",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:20,gap:12}}>
@@ -159,8 +137,11 @@ export default function App() {
                 <div style={card}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
                     <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>{tr.tasks.title}</h2><div style={{fontSize:12,color:"#6b7280",marginTop:3}}>{tr.tasks.subtitle(done,tasks.length)}</div></div>
-                    <div style={{width:44,height:44,borderRadius:"50%",background:"conic-gradient(#6366f1 "+(done/tasks.length)*360+"deg,rgba(255,255,255,.05) 0deg)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <div style={{width:32,height:32,borderRadius:"50%",background:"#0f1117",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#a5b4fc"}}>{Math.round((done/tasks.length)*100)}%</div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <button onClick={()=>setActiveNav("tasks")} style={{background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.2)",borderRadius:8,padding:"5px 10px",color:"#a5b4fc",fontSize:11,cursor:"pointer"}}>{isRTL?"לכל המשימות →":"All tasks →"}</button>
+                      <div style={{width:44,height:44,borderRadius:"50%",background:"conic-gradient(#6366f1 "+(done/tasks.length)*360+"deg,rgba(255,255,255,.05) 0deg)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <div style={{width:32,height:32,borderRadius:"50%",background:"#0f1117",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#a5b4fc"}}>{Math.round((done/tasks.length)*100)}%</div>
+                      </div>
                     </div>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -173,7 +154,7 @@ export default function App() {
                       </div>
                     </div>))}
                   </div>
-                  <button style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(99,102,241,.08)",border:"1px dashed rgba(99,102,241,.3)",borderRadius:10,color:"#a5b4fc",fontSize:13,cursor:"pointer"}}>{tr.tasks.addTask}</button>
+                  <button onClick={()=>setActiveNav("tasks")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(99,102,241,.08)",border:"1px dashed rgba(99,102,241,.3)",borderRadius:10,color:"#a5b4fc",fontSize:13,cursor:"pointer"}}>{tr.tasks.addTask}</button>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:20}}>
                   <div style={card}>
