@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Kelly from "./Kelly.jsx";
+import Shopping from "./Shopping.jsx";
 
 const T = {
   he: {
@@ -8,9 +9,9 @@ const T = {
     greetingName: "רז ואולגה 👋", members: "חברי משפחה",
     nav: { dashboard:"לוח בקרה", shopping:"קניות", tasks:"משימות", expenses:"הוצאות", car:"רכב", documents:"מסמכים", kelly:"קלי", health:"בריאות" },
     stats: { tasksToday:"משימות היום", completed:"הושלמו", shoppingItems:"פריטי קניות", inList:"ברשימה", monthlyBudget:"תקציב חודשי", remaining:"נותר", healthAlerts:"התראות בריאות", needAttention:"דורשות תשומת לב" },
-    tasks: { title:"משימות היום", subtitle:(d,t)=>`${d} מתוך ${t} הושלמו`, addTask:"+ הוסף משימה", priority:{high:"דחוף",medium:"בינוני",low:"נמוך"} },
+    tasks: { title:"משימות היום", subtitle:(d,t)=>d+" מתוך "+t+" הושלמו", addTask:"+ הוסף משימה", priority:{high:"דחוף",medium:"בינוני",low:"נמוך"} },
     shopping: { title:"הוספה מהירה", subtitle:"פריטים נפוצים", viewList:"לרשימה המלאה ←", items:["חלב","לחם","ביצים","קפה","בננות"] },
-    health: { title:"בריאות והתראות", subtitle:"תרופות וטיפולים", refillAlert:(n)=>`⚠ ${n} צריך חידוש`, daysLeft:(d)=>`${d} ימים`, refillSoon:"לחדש בקרוב!", due:"מועד", healthAlerts:(n)=>`⚠ ${n} התראות בריאות` },
+    health: { title:"בריאות והתראות", subtitle:"תרופות וטיפולים", refillAlert:(n)=>"⚠ "+n+" צריך חידוש", daysLeft:(d)=>d+" ימים", refillSoon:"לחדש בקרוב!", due:"מועד", healthAlerts:(n)=>"⚠ "+n+" התראות בריאות" },
     lang: "EN",
   },
   en: {
@@ -19,9 +20,9 @@ const T = {
     greetingName: "Raz & Olga 👋", members: "Members",
     nav: { dashboard:"Dashboard", shopping:"Shopping", tasks:"Tasks", expenses:"Expenses", car:"Car", documents:"Documents", kelly:"Kelly", health:"Health" },
     stats: { tasksToday:"Tasks Today", completed:"completed", shoppingItems:"Shopping Items", inList:"in list", monthlyBudget:"Monthly Budget", remaining:"remaining", healthAlerts:"Health Alerts", needAttention:"need attention" },
-    tasks: { title:"Today's Tasks", subtitle:(d,t)=>`${d} of ${t} done`, addTask:"+ Add task", priority:{high:"high",medium:"medium",low:"low"} },
+    tasks: { title:"Today's Tasks", subtitle:(d,t)=>d+" of "+t+" done", addTask:"+ Add task", priority:{high:"high",medium:"medium",low:"low"} },
     shopping: { title:"Quick Add", subtitle:"Most frequent items", viewList:"View list →", items:["Milk","Bread","Eggs","Coffee","Bananas"] },
-    health: { title:"Health & Alerts", subtitle:"Medications & treatments", refillAlert:(n)=>`⚠ ${n} refill needed`, daysLeft:(d)=>`${d}d left`, refillSoon:"Refill soon!", due:"Due", healthAlerts:(n)=>`⚠ ${n} health alerts` },
+    health: { title:"Health & Alerts", subtitle:"Medications & treatments", refillAlert:(n)=>"⚠ "+n+" refill needed", daysLeft:(d)=>d+"d left", refillSoon:"Refill soon!", due:"Due", healthAlerts:(n)=>"⚠ "+n+" health alerts" },
     lang: "עב",
   },
 };
@@ -50,6 +51,9 @@ const HEALTH_ITEMS = [
   {id:5,he:"מטפורמין",en:"Metformin",person:"Olga",daysLeft:6,type:"medication",refillAlert:true},
 ];
 
+// Pages that take full screen (no dashboard wrapper)
+const FULL_SCREEN_PAGES = ["kelly","shopping"];
+
 export default function App() {
   const [lang,setLang]=useState("he");
   const [activeNav,setActiveNav]=useState("dashboard");
@@ -65,25 +69,23 @@ export default function App() {
   const addCart=id=>{setAdded(p=>({...p,[id]:true}));setTimeout(()=>setAdded(p=>({...p,[id]:false})),1500);};
   const dateStr=now.toLocaleDateString(lang==="he"?"he-IL":"en-GB",{weekday:"long",day:"numeric",month:"long"});
   const card={background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:20,padding:24};
-
-  // Sidebar always on RIGHT in Hebrew, LEFT in English
   const sidebarSide = isRTL ? "right" : "left";
   const mainMargin = isRTL ? {marginRight:220} : {marginLeft:220};
+  const isFullScreen = FULL_SCREEN_PAGES.includes(activeNav);
 
   return (
     <div style={{fontFamily:"'Outfit',sans-serif",background:"#0f1117",minHeight:"100vh",display:"flex",color:"#e8eaf0",direction:tr.dir}}>
       <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,background:"radial-gradient(ellipse 60% 40% at 20% 10%,rgba(99,102,241,.12) 0%,transparent 60%),radial-gradient(ellipse 50% 50% at 80% 80%,rgba(16,185,129,.08) 0%,transparent 60%)"}}/>
       {sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:40}}/>}
 
-      {/* Sidebar - always RIGHT in Hebrew, LEFT in English */}
-      <aside className={`sidebar${sidebarOpen?" open":""}`} style={{
-        width:220, background:"rgba(17,19,30,.97)",
-        borderLeft: isRTL ? "none" : "1px solid rgba(255,255,255,.06)",
-        borderRight: isRTL ? "1px solid rgba(255,255,255,.06)" : "none",
-        display:"flex", flexDirection:"column", padding:"24px 0",
-        position:"fixed", top:0, bottom:0,
-        [sidebarSide]: 0,
-        zIndex:50, transition:"transform .3s ease"
+      {/* Sidebar */}
+      <aside className={"sidebar"+(sidebarOpen?" open":"")} style={{
+        width:220,background:"rgba(17,19,30,.97)",
+        borderLeft:isRTL?"none":"1px solid rgba(255,255,255,.06)",
+        borderRight:isRTL?"1px solid rgba(255,255,255,.06)":"none",
+        display:"flex",flexDirection:"column",padding:"24px 0",
+        position:"fixed",top:0,bottom:0,[sidebarSide]:0,
+        zIndex:50,transition:"transform .3s ease",
       }}>
         <div style={{padding:"0 20px 28px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -100,7 +102,7 @@ export default function App() {
               textAlign:isRTL?"right":"left",width:"100%",fontSize:14,fontWeight:active?600:400,
               borderRight:isRTL?(active?"2px solid #6366f1":"2px solid transparent"):"none",
               borderLeft:isRTL?"none":(active?"2px solid #6366f1":"2px solid transparent"),
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection:isRTL?"row-reverse":"row",
             }}>
               <span style={{fontSize:16}}>{item.icon}</span>
               <span style={{flex:1}}>{tr.nav[item.id]}</span>
@@ -113,7 +115,7 @@ export default function App() {
           <div style={{display:"flex",gap:8}}>
             {[{name:"Raz",color:"#6366f1"},{name:"Olga",color:"#06b6d4"},{name:"Kelly",color:"#10b981"}].map(m=>(
               <div key={m.name} style={{textAlign:"center"}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:m.color+"33",border:`2px solid ${m.color}66`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:m.color}}>{m.name[0]}</div>
+                <div style={{width:32,height:32,borderRadius:"50%",background:m.color+"33",border:"2px solid "+m.color+"66",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:m.color}}>{m.name[0]}</div>
                 <div style={{fontSize:9,color:"#4b5563",marginTop:3}}>{m.name}</div>
               </div>
             ))}
@@ -121,13 +123,15 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main content - margin matches sidebar side */}
+      {/* Main */}
       <main className="main-content" style={{flex:1,...mainMargin,position:"relative",zIndex:1,minHeight:"100vh"}}>
 
-        {/* Kelly page - full screen */}
-        {activeNav === "kelly" ? (
-          <Kelly lang={lang} />
-        ) : (
+        {/* Full-screen pages */}
+        {activeNav==="kelly"    && <Kelly    lang={lang}/>}
+        {activeNav==="shopping" && <Shopping lang={lang}/>}
+
+        {/* Dashboard pages */}
+        {!isFullScreen && (
           <>
             <header style={{padding:"20px 32px",background:"rgba(15,17,23,.85)",backdropFilter:"blur(10px)",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:20,gap:12}}>
               <button className="hamburger" onClick={()=>setSidebarOpen(!sidebarOpen)} style={{display:"none",background:"none",border:"none",color:"#9ca3af",fontSize:22,cursor:"pointer",padding:0,flexShrink:0}}>☰</button>
@@ -142,8 +146,8 @@ export default function App() {
             </header>
             <div style={{padding:"28px 32px"}}>
               <div className="stats-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:28}}>
-                {[{label:tr.stats.tasksToday,value:`${done}/${tasks.length}`,sub:tr.stats.completed,color:"#6366f1",icon:"✓"},{label:tr.stats.shoppingItems,value:"12",sub:tr.stats.inList,color:"#06b6d4",icon:"🛒"},{label:tr.stats.monthlyBudget,value:"₪4,200",sub:tr.stats.remaining,color:"#10b981",icon:"₪"},{label:tr.stats.healthAlerts,value:String(alerts.length),sub:tr.stats.needAttention,color:"#ef4444",icon:"♥"}].map(s=>(
-                  <div key={s.label} style={{...card,borderTop:`2px solid ${s.color}44`}}>
+                {[{label:tr.stats.tasksToday,value:done+"/"+tasks.length,sub:tr.stats.completed,color:"#6366f1",icon:"✓"},{label:tr.stats.shoppingItems,value:"12",sub:tr.stats.inList,color:"#06b6d4",icon:"🛒"},{label:tr.stats.monthlyBudget,value:"₪4,200",sub:tr.stats.remaining,color:"#10b981",icon:"₪"},{label:tr.stats.healthAlerts,value:String(alerts.length),sub:tr.stats.needAttention,color:"#ef4444",icon:"♥"}].map(s=>(
+                  <div key={s.label} style={{...card,borderTop:"2px solid "+s.color+"44"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                       <div><div style={{fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:1}}>{s.label}</div><div style={{fontSize:26,fontWeight:800,color:s.color,marginTop:4}}>{s.value}</div><div style={{fontSize:12,color:"#4b5563",marginTop:2}}>{s.sub}</div></div>
                       <div style={{width:36,height:36,borderRadius:10,background:s.color+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>{s.icon}</div>
@@ -155,7 +159,7 @@ export default function App() {
                 <div style={card}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
                     <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>{tr.tasks.title}</h2><div style={{fontSize:12,color:"#6b7280",marginTop:3}}>{tr.tasks.subtitle(done,tasks.length)}</div></div>
-                    <div style={{width:44,height:44,borderRadius:"50%",background:`conic-gradient(#6366f1 ${(done/tasks.length)*360}deg,rgba(255,255,255,.05) 0deg)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <div style={{width:44,height:44,borderRadius:"50%",background:"conic-gradient(#6366f1 "+(done/tasks.length)*360+"deg,rgba(255,255,255,.05) 0deg)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <div style={{width:32,height:32,borderRadius:"50%",background:"#0f1117",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#a5b4fc"}}>{Math.round((done/tasks.length)*100)}%</div>
                     </div>
                   </div>
@@ -175,7 +179,7 @@ export default function App() {
                   <div style={card}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexDirection:isRTL?"row-reverse":"row"}}>
                       <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>{tr.shopping.title}</h2><div style={{fontSize:12,color:"#6b7280",marginTop:3}}>{tr.shopping.subtitle}</div></div>
-                      <button style={{background:"rgba(6,182,212,.1)",border:"1px solid rgba(6,182,212,.2)",borderRadius:8,padding:"6px 12px",color:"#67e8f9",fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>{tr.shopping.viewList}</button>
+                      <button onClick={()=>setActiveNav("shopping")} style={{background:"rgba(6,182,212,.1)",border:"1px solid rgba(6,182,212,.2)",borderRadius:8,padding:"6px 12px",color:"#67e8f9",fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>{tr.shopping.viewList}</button>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
                       {tr.shopping.items.map((name,i)=>(<button key={i} onClick={()=>addCart(i)} style={{background:added[i]?"rgba(16,185,129,.15)":"rgba(255,255,255,.04)",border:added[i]?"1px solid rgba(16,185,129,.3)":"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5,transition:"all .2s"}}><span style={{fontSize:22}}>{added[i]?"✓":ICONS[i]}</span><span style={{fontSize:10,color:added[i]?"#6ee7b7":"#9ca3af",fontWeight:500}}>{name}</span></button>))}
@@ -202,21 +206,7 @@ export default function App() {
           </>
         )}
       </main>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box;}body{margin:0;}
-        @media(max-width:900px){.widgets-grid{grid-template-columns:1fr!important;}}
-        @media(max-width:768px){
-          .sidebar{transform:translateX(100%);}
-          [dir=ltr] .sidebar{transform:translateX(-100%);}
-          .sidebar.open{transform:translateX(0)!important;}
-          .main-content{margin-left:0!important;margin-right:0!important;}
-          .hamburger{display:flex!important;}
-          .stats-grid{grid-template-columns:repeat(2,1fr)!important;}
-          header{padding:14px 16px!important;}
-          .main-content>div{padding:16px!important;}
-        }
-      `}</style>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;}body{margin:0;}@media(max-width:900px){.widgets-grid{grid-template-columns:1fr!important;}}@media(max-width:768px){.sidebar{transform:translateX(100%);}[dir=ltr] .sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0)!important;}.main-content{margin-left:0!important;margin-right:0!important;}.hamburger{display:flex!important;}.stats-grid{grid-template-columns:repeat(2,1fr)!important;}header{padding:14px 16px!important;}.main-content>div{padding:16px!important;}}"}</style>
     </div>
   );
-          }
+      }
