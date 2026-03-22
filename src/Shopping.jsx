@@ -1,28 +1,83 @@
 import { useState, useMemo } from "react";
 
-// ── Supermarkets ──────────────────────────────────────────────
-const SUPERS = [
-  { id:"any",      he:"כל סופר",     en:"Any Store",      icon:"🛒" },
-  { id:"shufersal",he:"שופרסל",      en:"Shufersal",      icon:"🟠" },
-  { id:"rami",     he:"רמי לוי",     en:"Rami Levy",      icon:"🔵" },
-  { id:"machsane", he:"מחסני השוק",  en:"Machsane Hashuk",icon:"🟢" },
-  { id:"victory",  he:"ויקטורי",     en:"Victory",        icon:"🟣" },
-  { id:"yochananof",he:"יוחננוף",    en:"Yochananof",     icon:"🟡" },
-  { id:"online",   he:"אונליין",     en:"Online",         icon:"💻" },
-];
+// ── Market average prices (Israel, 2024) ──────────────────────
+// Based on known average supermarket prices in Israel
+const MARKET_PRICES = {
+  // Produce
+  "עגבניות":8, "tomatoes":8,
+  "מלפפון":7, "cucumber":7,
+  "בצל":5, "onion":5,
+  "גזר":6, "carrot":6,
+  "תפוחים":14, "apples":14,
+  "בננות":9, "bananas":9,
+  "תפוזים":8, "oranges":8,
+  "לימון":12, "lemon":12,
+  "אבוקדו":18, "avocado":18,
+  "תות שדה":22, "strawberries":22,
+  "ברוקולי":12, "broccoli":12,
+  "חסה":8, "lettuce":8,
+  "פלפל":14, "pepper":14,
+  // Dairy
+  "חלב":7, "milk":7,
+  "ביצים":18, "eggs":18,
+  "גבינה לבנה":9, "white cheese":9,
+  "גבינה צהובה":35, "yellow cheese":35,
+  "גבינה":35, "cheese":35,
+  "יוגורט":5, "yogurt":5,
+  "שמנת":8, "cream":8,
+  "חמאה":22, "butter":22,
+  "קוטג":6, "cottage":6,
+  // Meat
+  "חזה עוף":38, "chicken breast":38,
+  "עוף":25, "chicken":25,
+  "בשר טחון":45, "ground beef":45,
+  "סלמון":95, "salmon":95,
+  "טונה":16, "tuna":16,
+  // Bakery
+  "לחם":10, "bread":10,
+  "לחם מחמצת":22, "sourdough":22,
+  "פיתות":7, "pita":7,
+  "לחמניות":12, "rolls":12,
+  // Dry & canned
+  "שמן זית":28, "olive oil":28,
+  "שמן":18, "oil":18,
+  "סוכר":8, "sugar":8,
+  "קמח":7, "flour":7,
+  "אורז":14, "rice":14,
+  "פסטה":8, "pasta":8,
+  "קפה":55, "coffee":55,
+  "תה":18, "tea":18,
+  "שוקולד":15, "chocolate":15,
+  // Cleaning
+  "נייר טואלט":35, "toilet paper":35,
+  "אבקת כביסה":45, "laundry powder":45,
+  "ספוג":6, "sponge":6,
+  // Hygiene
+  "שמפו":28, "shampoo":28,
+  "סבון":12, "soap":12,
+  "קרם שיניים":18, "toothpaste":18,
+};
 
-// ── Categories — produce & dairy FIRST per user preference ───
+const getMarketPrice = (name) => {
+  const lower = name.toLowerCase();
+  for (const [k, v] of Object.entries(MARKET_PRICES)) {
+    if (lower.includes(k.toLowerCase())) return v;
+  }
+  return null;
+};
+
+// ── Categories — produce & dairy FIRST ───────────────────────
 const CATS = {
   he: [
-    { id:"produce",  label:"ירקות ופירות",    icon:"🥦" },
-    { id:"dairy",    label:"מוצרי חלב",       icon:"🥛" },
-    { id:"meat",     label:"בשר ודגים",       icon:"🥩" },
-    { id:"bakery",   label:"לחם ומאפים",      icon:"🍞" },
-    { id:"dry",      label:"יבשים ושימורים",  icon:"🫙" },
-    { id:"cleaning", label:"ניקיון",          icon:"🧹" },
-    { id:"hygiene",  label:"היגיינה",         icon:"🧴" },
-    { id:"snacks",   label:"חטיפים ומשקאות",  icon:"🍿" },
-    { id:"other",    label:"אחר",             icon:"📦" },
+    { id:"produce",  label:"ירקות ופירות",   icon:"🥦" },
+    { id:"dairy",    label:"מוצרי חלב",      icon:"🥛" },
+    { id:"meat",     label:"בשר ודגים",      icon:"🥩" },
+    { id:"bakery",   label:"לחם ומאפים",     icon:"🍞" },
+    { id:"dry",      label:"יבשים ושימורים", icon:"🫙" },
+    { id:"cleaning", label:"ניקיון",         icon:"🧹" },
+    { id:"hygiene",  label:"היגיינה",        icon:"🧴" },
+    { id:"snacks",   label:"חטיפים ומשקאות", icon:"🍿" },
+    { id:"other",    label:"אחר",            icon:"📦" },
   ],
   en: [
     { id:"produce",  label:"Produce",         icon:"🥦" },
@@ -37,143 +92,143 @@ const CATS = {
   ],
 };
 
-// ── Quick-add favourites ──────────────────────────────────────
 const FAVS = [
-  { id:"f1", he:"חלב",     en:"Milk",     icon:"🥛", cat:"dairy"   },
-  { id:"f2", he:"לחם",     en:"Bread",    icon:"🍞", cat:"bakery"  },
-  { id:"f3", he:"ביצים",   en:"Eggs",     icon:"🥚", cat:"dairy"   },
-  { id:"f4", he:"עגבניות", en:"Tomatoes", icon:"🍅", cat:"produce" },
-  { id:"f5", he:"עוף",     en:"Chicken",  icon:"🍗", cat:"meat"    },
-  { id:"f6", he:"קפה",     en:"Coffee",   icon:"☕", cat:"dry"     },
-  { id:"f7", he:"בננות",   en:"Bananas",  icon:"🍌", cat:"produce" },
-  { id:"f8", he:"גבינה",   en:"Cheese",   icon:"🧀", cat:"dairy"   },
+  { id:"f1", he:"חלב",     en:"Milk",      icon:"🥛", cat:"dairy"   },
+  { id:"f2", he:"לחם",     en:"Bread",     icon:"🍞", cat:"bakery"  },
+  { id:"f3", he:"ביצים",   en:"Eggs",      icon:"🥚", cat:"dairy"   },
+  { id:"f4", he:"עגבניות", en:"Tomatoes",  icon:"🍅", cat:"produce" },
+  { id:"f5", he:"עוף",     en:"Chicken",   icon:"🍗", cat:"meat"    },
+  { id:"f6", he:"קפה",     en:"Coffee",    icon:"☕", cat:"dry"     },
+  { id:"f7", he:"בננות",   en:"Bananas",   icon:"🍌", cat:"produce" },
+  { id:"f8", he:"גבינה",   en:"Cheese",    icon:"🧀", cat:"dairy"   },
 ];
 
-// ── Styles ────────────────────────────────────────────────────
 const S = {
   card: { background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:16, padding:20 },
   inp:  { background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:10, padding:"9px 12px", color:"#e8eaf0", fontSize:14, width:"100%", outline:"none", boxSizing:"border-box" },
   btn:  { background:"linear-gradient(135deg,#6366f1,#06b6d4)", border:"none", borderRadius:10, padding:"9px 18px", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" },
-  tag:  (c) => ({ fontSize:11, padding:"2px 8px", borderRadius:20, background:c+"22", color:c, border:"1px solid "+c+"44", fontWeight:600, whiteSpace:"nowrap" }),
+  pill: (active) => ({ background:active?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.04)", border:active?"1px solid rgba(99,102,241,0.4)":"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"5px 13px", color:active?"#a5b4fc":"#6b7280", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }),
 };
 
 const PERSON_COLORS = { Raz:"#6366f1", Olga:"#06b6d4", Both:"#10b981" };
 let uid = 100; const newId = () => String(++uid);
+
+// Price comparison helper
+const priceTag = (itemName, myPrice) => {
+  if (!myPrice || myPrice <= 0) return null;
+  const avg = getMarketPrice(itemName);
+  if (!avg) return null;
+  const ratio = myPrice / avg;
+  if (ratio < 0.85) return { label:"זול", color:"#10b981", icon:"👍" };
+  if (ratio <= 1.15) return { label:"מחיר שוק", color:"#6b7280", icon:"✓" };
+  if (ratio <= 1.4)  return { label:"יקר קצת", color:"#f59e0b", icon:"⚠" };
+  return { label:"יקר!", color:"#ef4444", icon:"🔴" };
+};
 
 export default function Shopping({ lang }) {
   const isRTL = lang === "he";
   const cats  = CATS[lang];
 
   const T = {
-    title:      isRTL ? "קניות" : "Shopping",
-    addItem:    isRTL ? "+ הוסף פריט" : "+ Add Item",
-    quickAdd:   isRTL ? "הוספה מהירה" : "Quick Add",
-    allCats:    isRTL ? "הכל" : "All",
-    allPeople:  isRTL ? "כולם" : "Everyone",
-    allSupers:  isRTL ? "כל הסופרים" : "All Stores",
-    showDone:   isRTL ? "הצג שנקנו" : "Show Bought",
-    hideDone:   isRTL ? "הסתר שנקנו" : "Hide Bought",
-    clearDone:  isRTL ? "נקה שנקנו" : "Clear Bought",
-    estimate:   isRTL ? "הערכת עלות" : "Est. Cost",
-    pending:    isRTL ? "ממתינים" : "Pending",
-    bought:     isRTL ? "נקנו" : "Bought",
-    listView:   isRTL ? "רשימה" : "List",
-    catView:    isRTL ? "קטגוריות" : "Categories",
-    superView:  isRTL ? "לפי סופר" : "By Store",
-    save:       isRTL ? "שמור" : "Save",
-    itemName:   isRTL ? "שם פריט" : "Item name",
-    qty:        isRTL ? "כמות" : "Qty",
-    unit:       isRTL ? "יחידה" : "Unit",
-    price:      isRTL ? "מחיר" : "Price",
-    person:     isRTL ? "מי קונה" : "Buyer",
-    category:   isRTL ? "קטגוריה" : "Category",
-    store:      isRTL ? "סופר" : "Store",
-    recurring:  isRTL ? "קבוע" : "Recurring",
-    empty:      isRTL ? "הרשימה ריקה 🎉" : "List is empty 🎉",
-    both:       isRTL ? "שניהם" : "Both",
-    search:     isRTL ? "חיפוש..." : "Search...",
+    title:     isRTL ? "קניות" : "Shopping",
+    addItem:   isRTL ? "+ הוסף פריט" : "+ Add Item",
+    quickAdd:  isRTL ? "הוספה מהירה" : "Quick Add",
+    allCats:   isRTL ? "הכל" : "All",
+    allPeople: isRTL ? "כולם" : "Everyone",
+    showDone:  isRTL ? "הצג שנקנו" : "Show Bought",
+    hideDone:  isRTL ? "הסתר שנקנו" : "Hide Bought",
+    clearDone: isRTL ? "נקה שנקנו" : "Clear Bought",
+    estimate:  isRTL ? "הערכת עלות" : "Est. Cost",
+    pending:   isRTL ? "ממתינים" : "Pending",
+    bought:    isRTL ? "נקנו" : "Bought",
+    save:      isRTL ? "שמור" : "Save",
+    itemName:  isRTL ? "שם פריט" : "Item name",
+    qty:       isRTL ? "כמות" : "Qty",
+    unit:      isRTL ? "יחידה" : "Unit",
+    price:     isRTL ? "מחיר ששילמת" : "Price paid",
+    person:    isRTL ? "מי קונה" : "Buyer",
+    category:  isRTL ? "קטגוריה" : "Category",
+    recurring: isRTL ? "קבוע" : "Recurring",
+    empty:     isRTL ? "הרשימה ריקה 🎉" : "List is empty 🎉",
+    both:      isRTL ? "שניהם" : "Both",
+    search:    isRTL ? "חיפוש..." : "Search...",
+    avgPrice:  isRTL ? "מחיר ממוצע בשוק" : "Market avg",
+    noAvg:     isRTL ? "אין נתון" : "No data",
   };
 
-  // ── State ──────────────────────────────────────────────────
   const [items, setItems] = useState([
-    { id:"1", he:"שמן זית",    en:"Olive Oil",     cat:"dry",     qty:1, unit:"בקבוק", person:"Both", price:28, store:"rami",     done:false, recurring:true  },
-    { id:"2", he:"חלב",        en:"Milk",          cat:"dairy",   qty:2, unit:"ליטר",  person:"Olga", price:9,  store:"shufersal",done:false, recurring:true  },
-    { id:"3", he:"חזה עוף",    en:"Chicken Breast",cat:"meat",    qty:1, unit:"kg",    person:"Raz",  price:42, store:"rami",     done:false, recurring:false },
-    { id:"4", he:"עגבניות",    en:"Tomatoes",      cat:"produce", qty:1, unit:"kg",    person:"Both", price:12, store:"shufersal",done:true,  recurring:false },
-    { id:"5", he:"לחם מחמצת",  en:"Sourdough",     cat:"bakery",  qty:1, unit:"כיכר",  person:"Both", price:22, store:"machsane", done:false, recurring:true  },
-    { id:"6", he:"נייר טואלט", en:"Toilet Paper",  cat:"cleaning",qty:1, unit:"חבילה", person:"Both", price:35, store:"any",      done:false, recurring:true  },
-    { id:"7", he:"תות שדה",    en:"Strawberries",  cat:"produce", qty:1, unit:"קופסה", person:"Both", price:18, store:"machsane", done:false, recurring:false },
-    { id:"8", he:"יוגורט",     en:"Yogurt",        cat:"dairy",   qty:3, unit:"יח",    person:"Olga", price:6,  store:"shufersal",done:false, recurring:true  },
+    { id:"1", he:"שמן זית",    en:"Olive Oil",      cat:"dry",     qty:1, unit:"בקבוק", person:"Both", price:28,  done:false, recurring:true  },
+    { id:"2", he:"חלב",        en:"Milk",           cat:"dairy",   qty:2, unit:"ליטר",  person:"Olga", price:7,   done:false, recurring:true  },
+    { id:"3", he:"חזה עוף",    en:"Chicken Breast", cat:"meat",    qty:1, unit:"kg",    person:"Raz",  price:42,  done:false, recurring:false },
+    { id:"4", he:"עגבניות",    en:"Tomatoes",       cat:"produce", qty:1, unit:"kg",    person:"Both", price:12,  done:true,  recurring:false },
+    { id:"5", he:"לחם מחמצת",  en:"Sourdough",      cat:"bakery",  qty:1, unit:"כיכר",  person:"Both", price:22,  done:false, recurring:true  },
+    { id:"6", he:"נייר טואלט", en:"Toilet Paper",   cat:"cleaning",qty:1, unit:"חבילה", person:"Both", price:35,  done:false, recurring:true  },
+    { id:"7", he:"תות שדה",    en:"Strawberries",   cat:"produce", qty:1, unit:"קופסה", person:"Both", price:28,  done:false, recurring:false },
+    { id:"8", he:"יוגורט",     en:"Yogurt",         cat:"dairy",   qty:3, unit:"יח",    person:"Olga", price:7,   done:false, recurring:true  },
+    { id:"9", he:"קפה",        en:"Coffee",         cat:"dry",     qty:1, unit:"250g",  person:"Both", price:65,  done:false, recurring:true  },
   ]);
 
-  const [filterCat,    setFilterCat]    = useState("all");
   const [filterPerson, setFilterPerson] = useState("all");
-  const [filterSuper,  setFilterSuper]  = useState("all");
   const [showDone,     setShowDone]     = useState(false);
-  const [view,         setView]         = useState("list");
   const [search,       setSearch]       = useState("");
   const [favAdded,     setFavAdded]     = useState({});
-  const [form, setForm] = useState({ he:"", en:"", cat:"produce", qty:"1", unit:"", person:"Both", price:"", store:"any", recurring:false });
+  const [form, setForm] = useState({ he:"", cat:"produce", qty:"1", unit:"", person:"Both", price:"", recurring:false });
   const [showForm, setShowForm] = useState(false);
 
-  // ── Derived ────────────────────────────────────────────────
-  const filtered = useMemo(() => items.filter(it => {
-    if (!showDone && it.done) return false;
-    if (filterCat !== "all" && it.cat !== filterCat) return false;
-    if (filterPerson !== "all" && it.person !== filterPerson && it.person !== "Both") return false;
-    if (filterSuper !== "all" && it.store !== filterSuper && it.store !== "any") return false;
-    const q = search.toLowerCase();
-    if (q && !it.he.toLowerCase().includes(q) && !it.en.toLowerCase().includes(q)) return false;
-    return true;
-  }), [items, filterCat, filterPerson, filterSuper, showDone, search]);
+  // Always group by category
+  const grouped = useMemo(() => {
+    const filtered = items.filter(it => {
+      if (!showDone && it.done) return false;
+      if (filterPerson !== "all" && it.person !== filterPerson && it.person !== "Both") return false;
+      const q = search.toLowerCase();
+      if (q && !it.he.toLowerCase().includes(q) && !(it.en||"").toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const map = {};
+    filtered.forEach(it => {
+      if (!map[it.cat]) map[it.cat] = [];
+      map[it.cat].push(it);
+    });
+    return map;
+  }, [items, filterPerson, showDone, search]);
 
-  const totalEst   = useMemo(() => items.filter(i=>!i.done).reduce((s,i)=>s+(i.price||0)*(i.qty||1),0), [items]);
-  const doneCount  = items.filter(i=>i.done).length;
-  const pendCount  = items.filter(i=>!i.done).length;
+  const totalEst  = useMemo(() => items.filter(i=>!i.done).reduce((s,i)=>s+(i.price||0)*(i.qty||1),0), [items]);
+  const doneCount = items.filter(i=>i.done).length;
+  const pendCount = items.filter(i=>!i.done).length;
 
-  const byCat = useMemo(() => {
-    const m={}; filtered.forEach(i=>{ if(!m[i.cat]) m[i.cat]=[]; m[i.cat].push(i); }); return m;
-  }, [filtered]);
-
-  const bySuper = useMemo(() => {
-    const m={}; filtered.forEach(i=>{ const k=i.store||"any"; if(!m[k]) m[k]=[]; m[k].push(i); }); return m;
-  }, [filtered]);
-
-  // ── Actions ────────────────────────────────────────────────
-  const toggle  = (id) => setItems(p=>p.map(i=>i.id===id?{...i,done:!i.done}:i));
-  const remove  = (id) => setItems(p=>p.filter(i=>i.id!==id));
+  const toggle    = (id) => setItems(p=>p.map(i=>i.id===id?{...i,done:!i.done}:i));
+  const remove    = (id) => setItems(p=>p.filter(i=>i.id!==id));
   const clearDone = () => setItems(p=>p.filter(i=>!i.done));
 
   const addItem = () => {
     if (!form.he.trim()) return;
-    setItems(p=>[...p,{...form,id:newId(),he:form.he.trim(),en:form.en.trim()||form.he.trim(),qty:parseFloat(form.qty)||1,price:parseFloat(form.price)||0,done:false}]);
-    setForm({he:"",en:"",cat:"produce",qty:"1",unit:"",person:"Both",price:"",store:"any",recurring:false});
+    setItems(p=>[...p,{...form,id:newId(),he:form.he.trim(),en:form.he.trim(),qty:parseFloat(form.qty)||1,price:parseFloat(form.price)||0,done:false}]);
+    setForm({he:"",cat:"produce",qty:"1",unit:"",person:"Both",price:"",recurring:false});
     setShowForm(false);
   };
 
   const addFav = (fav) => {
-    setItems(p=>[...p,{id:newId(),he:fav.he,en:fav.en,cat:fav.cat,qty:1,unit:"",person:"Both",price:0,store:"any",done:false,recurring:false}]);
+    setItems(p=>[...p,{id:newId(),he:fav.he,en:fav.en,cat:fav.cat,qty:1,unit:"",person:"Both",price:0,done:false,recurring:false}]);
     setFavAdded(p=>({...p,[fav.id]:true}));
     setTimeout(()=>setFavAdded(p=>({...p,[fav.id]:false})),1500);
   };
 
-  // ── Helpers ────────────────────────────────────────────────
-  const catLabel  = (id) => cats.find(c=>c.id===id)?.label || id;
-  const catIcon   = (id) => cats.find(c=>c.id===id)?.icon  || "📦";
-  const superInfo = (id) => SUPERS.find(s=>s.id===id) || SUPERS[0];
-  const pLabel    = (p)  => isRTL ? (p==="Both"?"שניהם":p) : (p==="שניהם"?"Both":p);
+  const catLabel = (id) => cats.find(c=>c.id===id)?.label || id;
+  const catIcon  = (id) => cats.find(c=>c.id===id)?.icon  || "📦";
+  const pLabel   = (p)  => isRTL ? (p==="Both"?"שניהם":p) : p;
 
-  // ── Item Row ───────────────────────────────────────────────
+  // ── Item Row ────────────────────────────────────────────────
   const ItemRow = ({ it }) => {
-    const sup = superInfo(it.store);
+    const pTag = priceTag(it.he, it.price);
+    const avgP = getMarketPrice(it.he);
     return (
       <div style={{
         display:"flex", alignItems:"center",
         flexDirection:isRTL?"row-reverse":"row",
-        gap:10, padding:"11px 14px", borderRadius:12,
+        gap:10, padding:"12px 14px", borderRadius:12,
         background:it.done?"rgba(16,185,129,0.05)":"rgba(255,255,255,0.03)",
-        border:it.done?"1px solid rgba(16,185,129,0.15)":"1px solid rgba(255,255,255,0.07)",
-        marginBottom:7, transition:"all .15s",
+        border:it.done?"1px solid rgba(16,185,129,0.15)":"1px solid rgba(255,255,255,0.06)",
+        marginBottom:7,
       }}>
         {/* Checkbox */}
         <div onClick={()=>toggle(it.id)} style={{
@@ -184,49 +239,50 @@ export default function Shopping({ lang }) {
           fontSize:12,color:"#fff",cursor:"pointer",
         }}>{it.done?"✓":""}</div>
 
-        {/* Cat icon */}
-        <span style={{fontSize:16,flexShrink:0}}>{catIcon(it.cat)}</span>
-
-        {/* Name */}
+        {/* Name + qty */}
         <div style={{flex:1,textAlign:isRTL?"right":"left"}}>
-          <div style={{fontSize:14,fontWeight:600,textDecoration:it.done?"line-through":"none",color:it.done?"#4b5563":"#e8eaf0"}}>
+          <div style={{
+            fontSize:14,fontWeight:600,
+            textDecoration:it.done?"line-through":"none",
+            color:it.done?"#4b5563":"#e8eaf0",
+          }}>
             {isRTL?it.he:it.en}
+            {it.recurring&&<span style={{marginRight:6,fontSize:11,color:"#f59e0b"}}>🔄</span>}
           </div>
-          <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap",justifyContent:isRTL?"flex-end":"flex-start"}}>
-            <span style={S.tag("#6b7280")}>{catLabel(it.cat)}</span>
-            {it.recurring&&<span style={S.tag("#f59e0b")}>🔄</span>}
-          </div>
+          {it.qty>1&&<div style={{fontSize:11,color:"#6b7280",marginTop:2}}>{it.qty} {it.unit}</div>}
         </div>
 
-        {/* Qty */}
-        <div style={{fontSize:13,fontWeight:700,color:"#a5b4fc",flexShrink:0,textAlign:"center"}}>
-          {it.qty}{it.unit?" "+it.unit:""}
-          {it.price>0&&<div style={{fontSize:10,color:"#6b7280"}}>&#8362;{it.price}</div>}
-        </div>
-
-        {/* Store badge */}
-        <div style={{...S.tag("#6b7280"),flexShrink:0}}>{sup.icon} {isRTL?sup.he:sup.en}</div>
+        {/* Price comparison block */}
+        {it.price>0 && (
+          <div style={{textAlign:"center",flexShrink:0}}>
+            <div style={{fontSize:14,fontWeight:700,color:"#a5b4fc"}}>&#8362;{it.price}</div>
+            {avgP&&(
+              <div style={{fontSize:10,color:"#6b7280"}}>
+                {isRTL?"שוק":"avg"}: &#8362;{avgP}
+              </div>
+            )}
+            {pTag&&(
+              <div style={{
+                fontSize:10,fontWeight:700,color:pTag.color,
+                marginTop:2,display:"flex",alignItems:"center",gap:2,justifyContent:"center"
+              }}>
+                {pTag.icon} {pTag.label}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Person */}
-        <div style={{...S.tag(PERSON_COLORS[it.person]||"#10b981"),flexShrink:0}}>{pLabel(it.person)}</div>
+        <div style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:(PERSON_COLORS[it.person]||"#10b981")+"22",color:PERSON_COLORS[it.person]||"#10b981",border:"1px solid "+(PERSON_COLORS[it.person]||"#10b981")+"44",fontWeight:600,flexShrink:0}}>
+          {pLabel(it.person)}
+        </div>
 
         {/* Delete */}
-        <button onClick={()=>remove(it.id)} style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:15,padding:"0 2px",flexShrink:0}}>✕</button>
+        <button onClick={()=>remove(it.id)} style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
       </div>
     );
   };
 
-  // ── Pill button ────────────────────────────────────────────
-  const Pill = ({active, onClick, children}) => (
-    <button onClick={onClick} style={{
-      background:active?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.04)",
-      border:active?"1px solid rgba(99,102,241,0.4)":"1px solid rgba(255,255,255,0.08)",
-      borderRadius:20,padding:"5px 13px",color:active?"#a5b4fc":"#6b7280",
-      fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",
-    }}>{children}</button>
-  );
-
-  // ── Render ─────────────────────────────────────────────────
   return (
     <div style={{fontFamily:"'Outfit',sans-serif",color:"#e8eaf0",direction:isRTL?"rtl":"ltr",minHeight:"100vh",background:"#0f1117"}}>
 
@@ -240,7 +296,7 @@ export default function Shopping({ lang }) {
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{...S.card,padding:"8px 16px",textAlign:"center",minWidth:90}}>
+          <div style={{...S.card,padding:"8px 16px",textAlign:"center"}}>
             <div style={{fontSize:10,color:"#6b7280"}}>{T.estimate}</div>
             <div style={{fontSize:18,fontWeight:800,color:"#10b981"}}>&#8362;{totalEst}</div>
           </div>
@@ -248,23 +304,21 @@ export default function Shopping({ lang }) {
         </div>
       </div>
 
-      <div style={{padding:"18px 22px",maxWidth:920,margin:"0 auto"}}>
+      <div style={{padding:"18px 22px",maxWidth:860,margin:"0 auto"}}>
 
         {/* Quick add */}
-        <div style={{...S.card,marginBottom:18}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#a5b4fc",marginBottom:12}}>⚡ {T.quickAdd}</div>
+        <div style={{...S.card,marginBottom:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#a5b4fc",marginBottom:11}}>⚡ {T.quickAdd}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:7}}>
             {FAVS.map(fav=>(
               <button key={fav.id} onClick={()=>addFav(fav)} style={{
                 background:favAdded[fav.id]?"rgba(16,185,129,0.15)":"rgba(255,255,255,0.04)",
-                border:favAdded[fav.id]?"1px solid rgba(16,185,129,0.3)":"1px solid rgba(255,255,255,0.08)",
+                border:favAdded[fav.id]?"1px solid rgba(16,185,129,0.3)":"1px solid rgba(255,255,255,0.07)",
                 borderRadius:11,padding:"9px 4px",cursor:"pointer",
                 display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all .2s",
               }}>
                 <span style={{fontSize:18}}>{favAdded[fav.id]?"✓":fav.icon}</span>
-                <span style={{fontSize:9,color:favAdded[fav.id]?"#6ee7b7":"#9ca3af",fontWeight:500}}>
-                  {isRTL?fav.he:fav.en}
-                </span>
+                <span style={{fontSize:9,color:favAdded[fav.id]?"#6ee7b7":"#9ca3af",fontWeight:500}}>{isRTL?fav.he:fav.en}</span>
               </button>
             ))}
           </div>
@@ -272,12 +326,11 @@ export default function Shopping({ lang }) {
 
         {/* Add form */}
         {showForm&&(
-          <div style={{...S.card,marginBottom:18,borderColor:"rgba(99,102,241,0.3)"}}>
-            {/* Row 1 */}
+          <div style={{...S.card,marginBottom:16,borderColor:"rgba(99,102,241,0.3)"}}>
             <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
               <div>
-                <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.itemName} (עברית)</div>
-                <input value={form.he} onChange={e=>setForm({...form,he:e.target.value})} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder="לדוגמה: תפוחים" style={S.inp}/>
+                <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.itemName}</div>
+                <input value={form.he} onChange={e=>setForm({...form,he:e.target.value})} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder={isRTL?"לדוגמה: תפוחים":"e.g. Apples"} style={S.inp} autoFocus/>
               </div>
               <div>
                 <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.qty}</div>
@@ -288,22 +341,20 @@ export default function Shopping({ lang }) {
                 <input value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})} placeholder="kg / יח..." style={S.inp}/>
               </div>
               <div>
-                <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.price} &#8362;</div>
+                <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>
+                  {T.price} &#8362;
+                  {form.he && getMarketPrice(form.he) && (
+                    <span style={{color:"#6366f1",marginRight:4}}>(שוק: &#8362;{getMarketPrice(form.he)})</span>
+                  )}
+                </div>
                 <input type="number" min="0" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="0" style={S.inp}/>
               </div>
             </div>
-            {/* Row 2 */}
-            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr auto",gap:10,alignItems:"end"}}>
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr auto",gap:10,alignItems:"end"}}>
               <div>
                 <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.category}</div>
                 <select value={form.cat} onChange={e=>setForm({...form,cat:e.target.value})} style={{...S.inp,appearance:"none"}}>
                   {cats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.store}</div>
-                <select value={form.store} onChange={e=>setForm({...form,store:e.target.value})} style={{...S.inp,appearance:"none"}}>
-                  {SUPERS.map(s=><option key={s.id} value={s.id}>{s.icon} {isRTL?s.he:s.en}</option>)}
                 </select>
               </div>
               <div>
@@ -321,92 +372,69 @@ export default function Shopping({ lang }) {
           </div>
         )}
 
-        {/* Filters bar */}
-        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-          {/* Search */}
-          <div style={{position:"relative",flex:"1 1 160px"}}>
+        {/* Filters */}
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{position:"relative",flex:"1 1 150px"}}>
             <span style={{position:"absolute",[isRTL?"right":"left"]:10,top:"50%",transform:"translateY(-50%)",color:"#6b7280",fontSize:13}}>🔍</span>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={T.search}
               style={{...S.inp,[isRTL?"paddingRight":"paddingLeft"]:32}}/>
           </div>
-          {/* Person filter */}
           <div style={{display:"flex",gap:5}}>
             {[{k:"all",l:T.allPeople},{k:"Raz",l:"Raz"},{k:"Olga",l:"Olga"}].map(({k,l})=>(
-              <Pill key={k} active={filterPerson===k} onClick={()=>setFilterPerson(k)}>{l}</Pill>
+              <button key={k} onClick={()=>setFilterPerson(k)} style={S.pill(filterPerson===k)}>{l}</button>
             ))}
           </div>
-          {/* View tabs */}
-          <div style={{display:"flex",gap:3,background:"rgba(255,255,255,0.04)",borderRadius:10,padding:3}}>
-            {[{v:"list",l:"≡ "+T.listView},{v:"category",l:"⊞ "+T.catView},{v:"store",l:"🏪 "+T.superView}].map(({v,l})=>(
-              <button key={v} onClick={()=>setView(v)} style={{background:view===v?"rgba(99,102,241,0.3)":"transparent",border:"none",borderRadius:8,padding:"5px 10px",color:view===v?"#a5b4fc":"#6b7280",fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
-            ))}
-          </div>
-          {/* Done controls */}
           <div style={{display:"flex",gap:5}}>
-            <Pill active={showDone} onClick={()=>setShowDone(!showDone)}>{showDone?T.hideDone:T.showDone}</Pill>
+            <button onClick={()=>setShowDone(!showDone)} style={S.pill(showDone)}>{showDone?T.hideDone:T.showDone}</button>
             {doneCount>0&&<button onClick={clearDone} style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:20,padding:"5px 12px",color:"#fca5a5",fontSize:12,cursor:"pointer"}}>{T.clearDone}</button>}
           </div>
         </div>
 
-        {/* Category filter pills */}
-        <div style={{display:"flex",gap:5,marginBottom:16,overflowX:"auto",paddingBottom:3}}>
-          <Pill active={filterCat==="all"} onClick={()=>setFilterCat("all")}>{T.allCats}</Pill>
-          {cats.map(c=><Pill key={c.id} active={filterCat===c.id} onClick={()=>setFilterCat(c.id)}>{c.icon} {c.label}</Pill>)}
+        {/* Price legend */}
+        <div style={{display:"flex",gap:14,marginBottom:16,flexWrap:"wrap",fontSize:11,color:"#6b7280",padding:"8px 14px",background:"rgba(255,255,255,0.02)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+          <span style={{fontWeight:600,color:"#9ca3af"}}>{isRTL?"השוואת מחיר לשוק:":"Price vs market:"}</span>
+          <span>👍 <span style={{color:"#10b981"}}>{isRTL?"זול":"Cheap"}</span> (&lt;85%)</span>
+          <span>✓ <span style={{color:"#6b7280"}}>{isRTL?"מחיר שוק":"Market price"}</span></span>
+          <span>⚠ <span style={{color:"#f59e0b"}}>{isRTL?"יקר קצת":"A bit pricey"}</span></span>
+          <span>🔴 <span style={{color:"#ef4444"}}>{isRTL?"יקר!":"Expensive!"}</span> (&gt;140%)</span>
         </div>
 
-        {/* Store filter pills — shown in store view */}
-        {view==="store"&&(
-          <div style={{display:"flex",gap:5,marginBottom:14,overflowX:"auto",paddingBottom:3}}>
-            <Pill active={filterSuper==="all"} onClick={()=>setFilterSuper("all")}>{T.allSupers}</Pill>
-            {SUPERS.filter(s=>s.id!=="any").map(s=>(
-              <Pill key={s.id} active={filterSuper===s.id} onClick={()=>setFilterSuper(s.id)}>{s.icon} {isRTL?s.he:s.en}</Pill>
-            ))}
+        {/* Items grouped by category */}
+        {cats.map(cat => {
+          const catItems = grouped[cat.id];
+          if (!catItems || catItems.length === 0) return null;
+          const catTotal = catItems.filter(i=>!i.done).reduce((s,i)=>s+(i.price||0)*(i.qty||1),0);
+          return (
+            <div key={cat.id} style={{marginBottom:22}}>
+              {/* Category header */}
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexDirection:isRTL?"row-reverse":"row",paddingBottom:8,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                <span style={{fontSize:20}}>{cat.icon}</span>
+                <span style={{fontSize:15,fontWeight:700}}>{cat.label}</span>
+                <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:"rgba(255,255,255,0.06)",color:"#6b7280",fontWeight:600}}>
+                  {catItems.length}
+                </span>
+                {catTotal>0&&(
+                  <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:"rgba(16,185,129,0.1)",color:"#10b981",fontWeight:600,marginRight:"auto"}}>
+                    &#8362;{catTotal}
+                  </span>
+                )}
+              </div>
+              {catItems.map(it => <ItemRow key={it.id} it={it}/>)}
+            </div>
+          );
+        })}
+
+        {/* Empty state */}
+        {cats.every(c=>!grouped[c.id]||grouped[c.id].length===0)&&(
+          <div style={{...S.card,textAlign:"center",padding:40,color:"#6b7280"}}>
+            <div style={{fontSize:36,marginBottom:10}}>🎉</div>
+            {T.empty}
           </div>
         )}
 
-        {/* ── LIST VIEW ── */}
-        {view==="list"&&(
-          filtered.length===0
-            ? <div style={{...S.card,textAlign:"center",padding:40,color:"#6b7280"}}><div style={{fontSize:36,marginBottom:10}}>🎉</div>{T.empty}</div>
-            : filtered.map(it=><ItemRow key={it.id} it={it}/>)
-        )}
-
-        {/* ── CATEGORY VIEW ── */}
-        {view==="category"&&cats.map(cat=>{
-          const ci=byCat[cat.id];
-          if(!ci||!ci.length) return null;
-          return(
-            <div key={cat.id} style={{marginBottom:18}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexDirection:isRTL?"row-reverse":"row"}}>
-                <span style={{fontSize:18}}>{cat.icon}</span>
-                <span style={{fontSize:14,fontWeight:700}}>{cat.label}</span>
-                <span style={{...S.tag("#6b7280")}}>{ci.length}</span>
-              </div>
-              {ci.map(it=><ItemRow key={it.id} it={it}/>)}
-            </div>
-          );
-        })}
-
-        {/* ── STORE VIEW ── */}
-        {view==="store"&&SUPERS.map(sup=>{
-          const si=bySuper[sup.id];
-          if(!si||!si.length) return null;
-          return(
-            <div key={sup.id} style={{marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexDirection:isRTL?"row-reverse":"row"}}>
-                <span style={{fontSize:20}}>{sup.icon}</span>
-                <span style={{fontSize:15,fontWeight:700}}>{isRTL?sup.he:sup.en}</span>
-                <span style={{...S.tag("#6b7280")}}>{si.length} פריטים</span>
-                <span style={{...S.tag("#10b981")}}>&#8362;{si.filter(i=>!i.done).reduce((s,i)=>s+(i.price||0)*(i.qty||1),0)}</span>
-              </div>
-              {si.map(it=><ItemRow key={it.id} it={it}/>)}
-            </div>
-          );
-        })}
-
         {/* Progress bar */}
         {items.length>0&&(
-          <div style={{...S.card,marginTop:16}}>
+          <div style={{...S.card,marginTop:8}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:12,color:"#6b7280"}}>
               <span>{doneCount} / {items.length} {isRTL?"נקנו":"bought"}</span>
               <span>{Math.round((doneCount/items.length)*100)}%</span>
@@ -420,4 +448,4 @@ export default function Shopping({ lang }) {
       </div>
     </div>
   );
-      }
+  }
