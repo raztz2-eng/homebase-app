@@ -3,6 +3,7 @@ import Kelly     from "./Kelly.jsx";
 import Shopping  from "./Shopping.jsx";
 import Tasks     from "./Tasks.jsx";
 import Documents from "./Documents.jsx";
+import Expenses  from "./Expenses.jsx";
 import { saveDoc, COL } from "./firebase.js";
 
 const T = {
@@ -45,21 +46,21 @@ const HEALTH_ITEMS = [
   {id:5,he:"מטפורמין",en:"Metformin",person:"Olga",daysLeft:6,type:"medication",refillAlert:true},
 ];
 
-const FULL_SCREEN = ["kelly","shopping","tasks","documents"];
+const FULL_SCREEN = ["kelly","shopping","tasks","documents","expenses"];
 
 export default function App() {
-  const [lang,setLang]       = useState("he");
-  const [activeNav,setNav]   = useState("dashboard");
-  const [tasks,setTasks]     = useState([
+  const [lang,setLang]     = useState("he");
+  const [activeNav,setNav] = useState("dashboard");
+  const [tasks,setTasks]   = useState([
     {id:1,he:"לקבוע תור לרופא שיניים",en:"Book dentist",person:"Raz",done:false,priority:"high"},
     {id:2,he:"לקנות מצרכים",en:"Buy groceries",person:"Olga",done:true,priority:"medium"},
     {id:3,he:"לשלם חשבון חשמל",en:"Pay electricity",person:"Raz",done:false,priority:"high"},
     {id:4,he:"לקבוע וטרינר לקלי",en:"Vet for Kelly",person:"Olga",done:false,priority:"medium"},
     {id:5,he:"תזכורת טיפול ברכב",en:"Car service",person:"Raz",done:false,priority:"low"},
   ]);
-  const [sidebarOpen,setSB]  = useState(false);
-  const [added,setAdded]     = useState({});
-  const [now,setNow]         = useState(new Date());
+  const [sidebarOpen,setSB] = useState(false);
+  const [added,setAdded]   = useState({});
+  const [now,setNow]       = useState(new Date());
 
   useEffect(()=>{ const t=setInterval(()=>setNow(new Date()),60000); return()=>clearInterval(t); },[]);
 
@@ -74,7 +75,6 @@ export default function App() {
   const mainMargin=isRTL?{marginRight:220}:{marginLeft:220};
   const isFullScreen=FULL_SCREEN.includes(activeNav);
 
-  // Add task from Kelly
   const handleAddTask = async (task) => {
     await saveDoc(COL.tasks, task.id, task);
   };
@@ -120,6 +120,7 @@ export default function App() {
         {activeNav==="shopping"  && <Shopping  lang={lang}/>}
         {activeNav==="tasks"     && <Tasks     lang={lang}/>}
         {activeNav==="documents" && <Documents lang={lang}/>}
+        {activeNav==="expenses"  && <Expenses/>}
 
         {!isFullScreen && (
           <>
@@ -194,4 +195,4 @@ export default function App() {
       <style>{"@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;}body{margin:0;}@media(max-width:900px){.widgets-grid{grid-template-columns:1fr!important;}}@media(max-width:768px){.sidebar{transform:translateX(100%);}[dir=ltr] .sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0)!important;}.main-content{margin-left:0!important;margin-right:0!important;}.hamburger{display:flex!important;}.stats-grid{grid-template-columns:repeat(2,1fr)!important;}}"}</style>
     </div>
   );
-           }
+    }
