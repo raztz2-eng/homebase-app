@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { listenCol, saveDoc, deleteDocById, COL } from "./firebase.js";
 
 const PERSON_COLORS = { Raz:"#6366f1", Olga:"#06b6d4", Both:"#10b981" };
@@ -24,6 +24,7 @@ const uc=(d)=>d===null?null:d<=0?"#ef4444":d<=3?"#f59e0b":d<=7?"#06b6d4":"#6b728
 const rl=(id,l)=>RECUR.find(r=>r.id===id)?.[l]||id;
 const ci=(id)=>CATS.find(c=>c.id===id)||CATS[CATS.length-1];
 const nd=(last,rec)=>{if(!last||rec==="none")return null;const d=new Date(last);const a={daily:1,weekly:7,biweekly:14,monthly:30,bimonthly:60,quarterly:90,yearly:365};d.setDate(d.getDate()+(a[rec]||0));return d.toISOString().slice(0,10);};
+
 const S={
   card:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:20},
   inp:{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"9px 12px",color:"#e8eaf0",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"},
@@ -32,7 +33,33 @@ const S={
   tag:(c)=>({fontSize:11,padding:"2px 8px",borderRadius:20,background:c+"22",color:c,border:"1px solid "+c+"44",fontWeight:600,whiteSpace:"nowrap"}),
 };
 
-export default function Tasks({lang}){
+// ── Confetti ────────────────────────────────────────────────
+function Confetti({show}){
+  if(!show) return null;
+  const pieces=Array.from({length:60},(_,i)=>({
+    id:i,
+    x:Math.random()*100,
+    color:["#6366f1","#06b6d4","#10b981","#f59e0b","#ef4444","#a855f7","#ec4899"][Math.floor(Math.random()*7)],
+    size:6+Math.random()*8,
+    delay:Math.random()*0.5,
+    dur:1.5+Math.random()*1,
+  }));
+  return(
+    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9999,overflow:"hidden"}}>
+      {pieces.map(p=>(
+        <div key={p.id} style={{
+          position:"absolute",top:"-20px",left:p.x+"%",
+          width:p.size,height:p.size,
+          background:p.color,borderRadius:p.size>10?"50%":"2px",
+          animation:"confettiFall "+p.dur+"s "+p.delay+"s ease-in forwards",
+        }}/>
+      ))}
+      <style>{`@keyframes confettiFall{0%{transform:translateY(0) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}`}</style>
+    </div>
+  );
+}
+
+export default function Tasks({lang,onNavigate}){
   const isRTL=lang==="he";
   const T={
     title:isRTL?"משימות":"Tasks",add:isRTL?"+ משימה חדשה":"+ New Task",
@@ -45,8 +72,12 @@ export default function Tasks({lang}){
     empty:isRTL?"אין משימות 🎉":"No tasks 🎉",next:isRTL?"הבא:":"Next:",
     both:isRTL?"שניהם":"Both",sync:isRTL?"מסנכרן...":"Syncing...",
     synced:isRTL?"מסונכרן 🔥":"Synced 🔥",
+    showDone:isRTL?"הצג משימות שהושלמו":"Show completed",
+    hideDone:isRTL?"הסתר שהושלמו":"Hide completed",
+    dashboard:isRTL?"לוח בקרה":"Dashboard",
     dl:(d)=>d===0?(isRTL?"היום!":"Today!"):d<0?(isRTL?Math.abs(d)+" ימי איחור":Math.abs(d)+" overdue"):(isRTL?"עוד "+d+" ימים":"in "+d+" days"),
   };
+
   const [tasks,setTasks]=useState([]);
   const [loading,setLoading]=useState(true);
   const [view,setView]=useState("pending");
@@ -55,6 +86,8 @@ export default function Tasks({lang}){
   const [q,setQ]=useState("");
   const [showForm,setShowForm]=useState(false);
   const [editId,setEditId]=useState(null);
+  const [showDone,setShowDone]=useState(false);
+  const [confetti,setConfetti]=useState(false);
   const ef={he:"",en:"",cat:"bills",priority:"medium",person:"Both",recur:"none",dueDate:"",note:""};
   const [form,setForm]=useState(ef);
 
@@ -70,29 +103,39 @@ export default function Tasks({lang}){
   const dc=useMemo(()=>tasks.filter(t=>t.done).length,[tasks]);
 
   const filtered=useMemo(()=>tasks.filter(t=>{
-    const d=du(t.dueDate);
-    if(view==="pending"&&t.done)return false;
-    if(view==="done"&&!t.done)return false;
-    if(view==="overdue"&&(t.done||d===null||d>=0))return false;
-    if(view==="recurring"&&t.recur==="none")return false;
-    if(fp!=="all"&&t.person!==fp&&t.person!=="Both")return false;
-    if(fc!=="all"&&t.cat!==fc)return false;
+    if(!showDone&&t.done) return false;
+    if(view==="pending"&&t.done) return false;
+    if(view==="done"&&!t.done) return false;
+    if(view==="overdue"&&(t.done||du(t.dueDate)===null||du(t.dueDate)>=0)) return false;
+    if(view==="recurring"&&t.recur==="none") return false;
+    if(fp!=="all"&&t.person!==fp&&t.person!=="Both") return false;
+    if(fc!=="all"&&t.cat!==fc) return false;
     const sq=q.toLowerCase();
-    if(sq&&!t.he.toLowerCase().includes(sq)&&!(t.en||"").toLowerCase().includes(sq))return false;
+    if(sq&&!t.he.toLowerCase().includes(sq)&&!(t.en||"").toLowerCase().includes(sq)) return false;
     return true;
-  }).sort((a,b)=>(du(a.dueDate)??9999)-(du(b.dueDate)??9999)),[tasks,view,fp,fc,q]);
+  }).sort((a,b)=>(du(a.dueDate)??9999)-(du(b.dueDate)??9999)),[tasks,view,fp,fc,q,showDone]);
 
-  const markDone=async(t)=>{const n=t.recur!=="none"?nd(today(),t.recur):t.dueDate;await saveDoc(COL.tasks,t.id,{done:t.recur==="none",lastDone:today(),dueDate:t.recur!=="none"?n:t.dueDate});};
+  const markDone=async(t)=>{
+    const n=t.recur!=="none"?nd(today(),t.recur):t.dueDate;
+    await saveDoc(COL.tasks,t.id,{done:t.recur==="none",lastDone:today(),dueDate:t.recur!=="none"?n:t.dueDate});
+    if(t.recur==="none"){
+      setConfetti(true);
+      setTimeout(()=>setConfetti(false),2500);
+    }
+  };
   const del=async(id)=>deleteDocById(COL.tasks,id);
   const openAdd=()=>{setForm(ef);setEditId(null);setShowForm(true);};
   const openEdit=(t)=>{setForm({...t});setEditId(t.id);setShowForm(true);};
   const save=async()=>{
-    if(!form.he.trim())return;
+    if(!form.he.trim()) return;
     const id=editId||newId();
     await saveDoc(COL.tasks,id,{...form,id,he:form.he.trim(),en:form.en||form.he.trim(),done:false,lastDone:editId?(tasks.find(t=>t.id===editId)?.lastDone||""):""});
     setShowForm(false);setEditId(null);
   };
   const pl=(p)=>isRTL?(p==="Both"?"שניהם":p):(p==="שניהם"?"Both":p);
+
+  // Fix note field - use useCallback to prevent re-render focus loss
+  const setNote=useCallback((val)=>setForm(f=>({...f,note:val})),[]);
 
   const Card=({t})=>{
     const d=du(t.dueDate),u=uc(d),cat=ci(t.cat),pcolor=PERSON_COLORS[t.person]||PERSON_COLORS["Both"];
@@ -132,16 +175,42 @@ export default function Tasks({lang}){
     <div style={{...S.card,marginBottom:20,borderColor:"rgba(99,102,241,0.3)"}}>
       <div style={{fontSize:14,fontWeight:700,color:"#a5b4fc",marginBottom:14}}>{editId?(isRTL?"עריכה":"Edit"):(isRTL?"משימה חדשה":"New Task")}</div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10,marginBottom:10}}>
-        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.name}</div><input value={form.he} onChange={e=>setForm({...form,he:e.target.value})} placeholder={isRTL?"לדוגמה: תשלום ארנונה":"e.g. Pay Arnona"} style={S.inp} autoFocus onKeyDown={e=>e.key==="Enter"&&save()}/></div>
-        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.cat}</div><select value={form.cat} onChange={e=>setForm({...form,cat:e.target.value})} style={{...S.inp,appearance:"none"}}>{CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {isRTL?c.he:c.en}</option>)}</select></div>
+        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.name}</div>
+          <input value={form.he} onChange={e=>setForm(f=>({...f,he:e.target.value}))} placeholder={isRTL?"לדוגמה: תשלום ארנונה":"e.g. Pay Arnona"} style={S.inp} autoFocus/>
+        </div>
+        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.cat}</div>
+          <select value={form.cat} onChange={e=>setForm(f=>({...f,cat:e.target.value}))} style={{...S.inp,appearance:"none",color:"#1f2937"}}>
+            {CATS.map(c=><option key={c.id} value={c.id} style={{color:"#1f2937",background:"#fff"}}>{c.icon} {isRTL?c.he:c.en}</option>)}
+          </select>
+        </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
-        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.freq}</div><select value={form.recur} onChange={e=>setForm({...form,recur:e.target.value})} style={{...S.inp,appearance:"none"}}>{RECUR.map(r=><option key={r.id} value={r.id}>{isRTL?r.he:r.en}</option>)}</select></div>
-        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.due}</div><input type="date" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})} style={S.inp}/></div>
-        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.who}</div><select value={form.person} onChange={e=>setForm({...form,person:e.target.value})} style={{...S.inp,appearance:"none"}}>{["Raz","Olga",T.both].map(p=><option key={p}>{p}</option>)}</select></div>
-        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.pri}</div><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} style={{...S.inp,appearance:"none"}}>{["high","medium","low"].map(p=><option key={p} value={p}>{PL[lang][p]}</option>)}</select></div>
+        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.freq}</div>
+          <select value={form.recur} onChange={e=>setForm(f=>({...f,recur:e.target.value}))} style={{...S.inp,appearance:"none",color:"#1f2937"}}>
+            {RECUR.map(r=><option key={r.id} value={r.id} style={{color:"#1f2937",background:"#fff"}}>{isRTL?r.he:r.en}</option>)}
+          </select>
+        </div>
+        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.due}</div><input type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))} style={S.inp}/></div>
+        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.who}</div>
+          <select value={form.person} onChange={e=>setForm(f=>({...f,person:e.target.value}))} style={{...S.inp,appearance:"none",color:"#1f2937"}}>
+            {["Raz","Olga",T.both].map(p=><option key={p} style={{color:"#1f2937",background:"#fff"}}>{p}</option>)}
+          </select>
+        </div>
+        <div><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.pri}</div>
+          <select value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))} style={{...S.inp,appearance:"none",color:"#1f2937"}}>
+            {["high","medium","low"].map(p=><option key={p} value={p} style={{color:"#1f2937",background:"#fff"}}>{PL[lang][p]}</option>)}
+          </select>
+        </div>
       </div>
-      <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.note}</div><input value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder={isRTL?"הערה אופציונלית...":"Optional note..."} style={S.inp}/></div>
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:"#6b7280",marginBottom:4}}>{T.note}</div>
+        <input
+          value={form.note}
+          onChange={e=>setNote(e.target.value)}
+          placeholder={isRTL?"הערה אופציונלית...":"Optional note..."}
+          style={S.inp}
+        />
+      </div>
       <div style={{display:"flex",gap:8,flexDirection:isRTL?"row-reverse":"row"}}>
         <button onClick={save} style={S.btn}>{T.save}</button>
         <button onClick={()=>setShowForm(false)} style={{...S.btn,background:"rgba(255,255,255,0.08)"}}>{T.cancel}</button>
@@ -153,6 +222,7 @@ export default function Tasks({lang}){
 
   return(
     <div style={{fontFamily:"'Outfit',sans-serif",color:"#e8eaf0",direction:isRTL?"rtl":"ltr",minHeight:"100vh",background:"#0f1117"}}>
+      <Confetti show={confetti}/>
       <div style={{background:"rgba(17,19,30,0.95)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#6366f1,#a855f7)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>✓</div>
@@ -165,7 +235,10 @@ export default function Tasks({lang}){
             </div>
           </div>
         </div>
-        <button onClick={openAdd} style={S.btn}>{T.add}</button>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>onNavigate&&onNavigate("dashboard")} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"7px 14px",color:"#9ca3af",fontSize:12,cursor:"pointer"}}>⬅ {T.dashboard}</button>
+          <button onClick={openAdd} style={S.btn}>{T.add}</button>
+        </div>
       </div>
       <div style={{padding:"18px 22px",maxWidth:860,margin:"0 auto"}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:20}} className="tasks-stats">
@@ -183,12 +256,15 @@ export default function Tasks({lang}){
             <input value={q} onChange={e=>setQ(e.target.value)} placeholder={isRTL?"חיפוש...":"Search..."} style={{...S.inp,[isRTL?"paddingRight":"paddingLeft"]:32}}/>
           </div>
           <div style={{display:"flex",gap:3,background:"rgba(255,255,255,0.04)",borderRadius:10,padding:3}}>
-            {[{v:"pending",l:isRTL?"ממתינות":"Pending"},{v:"overdue",l:isRTL?"באיחור":"Overdue"},{v:"recurring",l:isRTL?"מחזוריות":"Recurring"},{v:"done",l:isRTL?"הושלמו":"Done"}].map(({v,l})=>(
+            {[{v:"pending",l:isRTL?"ממתינות":"Pending"},{v:"overdue",l:isRTL?"באיחור":"Overdue"},{v:"recurring",l:isRTL?"מחזוריות":"Recurring"}].map(({v,l})=>(
               <button key={v} onClick={()=>setView(v)} style={{background:view===v?"rgba(99,102,241,0.3)":"transparent",border:"none",borderRadius:8,padding:"5px 11px",color:view===v?"#a5b4fc":"#6b7280",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                 {l}{v==="overdue"&&oc>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:9,borderRadius:20,padding:"1px 5px",marginRight:4}}>{oc}</span>}
               </button>
             ))}
           </div>
+          <button onClick={()=>setShowDone(!showDone)} style={{background:showDone?"rgba(16,185,129,0.15)":"rgba(255,255,255,0.04)",border:showDone?"1px solid rgba(16,185,129,0.3)":"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"5px 13px",color:showDone?"#6ee7b7":"#6b7280",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+            {showDone?T.hideDone:T.showDone} ({dc})
+          </button>
           <div style={{display:"flex",gap:5}}>
             {[{k:"all",l:T.everyone},{k:"Raz",l:"Raz"},{k:"Olga",l:"Olga"}].map(({k,l})=>(
               <button key={k} onClick={()=>setFp(k)} style={S.pill(fp===k)}>{l}</button>
@@ -204,4 +280,4 @@ export default function Tasks({lang}){
       <style>{"@media(max-width:600px){.tasks-stats{grid-template-columns:repeat(3,1fr)!important;}}"}</style>
     </div>
   );
-    }
+}
