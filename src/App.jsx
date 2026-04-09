@@ -6,211 +6,212 @@ import Documents from "./Documents.jsx";
 import Expenses  from "./Expenses.jsx";
 import { saveDoc, listenCol, COL } from "./firebase.js";
 
-const NAV_ITEMS = [
-  {id:"dashboard",icon:"⊞"},{id:"shopping",icon:"🛒"},{id:"tasks",icon:"✓"},
-  {id:"expenses",icon:"₪"},{id:"car",icon:"🚗"},{id:"documents",icon:"📁"},
-  {id:"kelly",icon:"🐕"},{id:"health",icon:"♥"},
+const NAV=[
+  {id:"dashboard",icon:"⊞",he:"לוח בקרה",en:"Dashboard"},
+  {id:"shopping",icon:"🛒",he:"קניות",en:"Shopping"},
+  {id:"tasks",icon:"✓",he:"משימות",en:"Tasks"},
+  {id:"expenses",icon:"₪",he:"הוצאות",en:"Expenses"},
+  {id:"car",icon:"🚗",he:"רכב",en:"Car"},
+  {id:"documents",icon:"📁",he:"מסמכים",en:"Documents"},
+  {id:"kelly",icon:"🐕",he:"קלי",en:"Kelly"},
+  {id:"health",icon:"♥",he:"בריאות",en:"Health"},
 ];
-const ICONS = ["🥛","🍞","🥚","☕","🍌"];
-const FULL_SCREEN = ["kelly","shopping","tasks","documents","expenses"];
-
-const T = {
-  he:{dir:"rtl",appName:"הבית שלנו",appSub:"לוח משפחתי",
-    greeting:(h)=>h<12?"בוקר טוב":h<17?"צהריים טובים":"ערב טוב",
-    greetingName:"רז ואולגה 👋",members:"חברי משפחה",
-    nav:{dashboard:"לוח בקרה",shopping:"קניות",tasks:"משימות",expenses:"הוצאות",car:"רכב",documents:"מסמכים",kelly:"קלי",health:"בריאות"},
-    addTask:"+ הוסף משימה",viewAll:"כל המשימות",quickAdd:"הוספה מהירה",frequent:"פריטים נפוצים",viewList:"לרשימה",
-    items:["חלב","לחם","ביצים","קפה","בננות"],
-    health:"בריאות והתראות",meds:"תרופות וטיפולים",refill:"צריך חידוש",daysLeft:(d)=>d+" ימים",soon:"לחדש!",due:"מועד",
-    lang:"EN",urgent:"דחוף",today2:"היום",overdue:"באיחור",
-  },
-  en:{dir:"ltr",appName:"HomeBase",appSub:"Family Dashboard",
-    greeting:(h)=>h<12?"Good morning":h<17?"Good afternoon":"Good evening",
-    greetingName:"Raz & Olga 👋",members:"Members",
-    nav:{dashboard:"Dashboard",shopping:"Shopping",tasks:"Tasks",expenses:"Expenses",car:"Car",documents:"Documents",kelly:"Kelly",health:"Health"},
-    addTask:"+ Add task",viewAll:"View all",quickAdd:"Quick Add",frequent:"Most frequent",viewList:"View list",
-    items:["Milk","Bread","Eggs","Coffee","Bananas"],
-    health:"Health & Alerts",meds:"Medications",refill:"refill needed",daysLeft:(d)=>d+"d left",soon:"Refill soon!",due:"Due",
-    lang:"עב",urgent:"Urgent",today2:"Today",overdue:"Overdue",
-  },
-};
-
-const HEALTH = [
+const ICONS=["🥛","🍞","🥚","☕","🍌"];
+const FULL=["kelly","shopping","tasks","documents","expenses"];
+const HEALTH=[
   {id:1,he:"ויטמין D",en:"Vitamin D",person:"Raz",daysLeft:5,type:"medication",alert:true},
   {id:2,he:"אומגה 3",en:"Omega-3",person:"Olga",daysLeft:14,type:"medication",alert:false},
-  {id:3,he:"פרעושים קלי",en:"Kelly Flea Treatment",person:"Kelly",dueDate:"28/3",type:"treatment",alert:false},
+  {id:3,he:"פרעושים קלי",en:"Kelly Flea",person:"Kelly",dueDate:"28/3",type:"treatment",alert:false},
   {id:4,he:"בדיקת דם",en:"Blood Test",person:"Raz",dueDate:"5/4",type:"appointment",alert:false},
   {id:5,he:"מטפורמין",en:"Metformin",person:"Olga",daysLeft:6,type:"medication",alert:true},
 ];
 
 export default function App(){
   const [lang,setLang]=useState("he");
-  const [activeNav,setNav]=useState("dashboard");
-  const [sidebarOpen,setSB]=useState(false);
+  const [nav,setNav]=useState("dashboard");
+  const [sb,setSb]=useState(false);
   const [added,setAdded]=useState({});
   const [now,setNow]=useState(new Date());
-  const [fbTasks,setFbTasks]=useState([]);
+  const [tasks,setTasks]=useState([]);
 
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),60000);return()=>clearInterval(t);},[]);
-  useEffect(()=>{
-    const u=listenCol(COL.tasks,(d)=>setFbTasks(d));
-    return()=>u();
-  },[]);
+  useEffect(()=>{const u=listenCol(COL.tasks,d=>setTasks(d));return()=>u();},[]);
 
-  const tr=T[lang],isRTL=lang==="he";
+  const isRTL=lang==="he";
   const today=new Date().toISOString().slice(0,10);
-  const card={background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:20,padding:24};
-  const sidebarSide=isRTL?"right":"left";
-  const mainMargin=isRTL?{marginRight:220}:{marginLeft:220};
-  const isFS=FULL_SCREEN.includes(activeNav);
   const alerts=HEALTH.filter(h=>h.alert);
-
-  const handleAddTask=async(task)=>{await saveDoc(COL.tasks,task.id,task);};
-  const toggleTask=async(t)=>{await saveDoc(COL.tasks,t.id,{done:!t.done});};
-  const addCart=(i)=>{setAdded(p=>({...p,[i]:true}));setTimeout(()=>setAdded(p=>({...p,[i]:false})),1500);};
-
-  // Dashboard tasks: open, sorted by urgency/date
-  const dashTasks = fbTasks
-    .filter(t=>!t.done)
-    .sort((a,b)=>{
-      const priOrder={high:0,medium:1,low:2};
-      if(priOrder[a.priority]!==priOrder[b.priority]) return priOrder[a.priority]-priOrder[b.priority];
-      const da=a.dueDate?new Date(a.dueDate):new Date("2099-01-01");
-      const db=b.dueDate?new Date(b.dueDate):new Date("2099-01-01");
-      return da-db;
-    })
-    .slice(0,5);
-
-  const doneCount=fbTasks.filter(t=>t.done).length;
-  const openCount=fbTasks.filter(t=>!t.done).length;
-  const overdueCount=fbTasks.filter(t=>!t.done&&t.dueDate&&new Date(t.dueDate)<new Date(today)).length;
+  const openTasks=tasks.filter(t=>!t.done);
+  const doneTasks=tasks.filter(t=>t.done);
+  const overdue=tasks.filter(t=>!t.done&&t.dueDate&&new Date(t.dueDate)<new Date(today));
+  const dashTasks=openTasks.sort((a,b)=>{const p={high:0,medium:1,low:2};if(p[a.priority]!==p[b.priority])return p[a.priority]-p[b.priority];return(a.dueDate||"9")>(b.dueDate||"9")?1:-1;}).slice(0,5);
   const dateStr=now.toLocaleDateString(lang==="he"?"he-IL":"en-GB",{weekday:"long",day:"numeric",month:"long"});
+  const greeting=isRTL?(now.getHours()<12?"בוקר טוב":now.getHours()<17?"צהריים טובים":"ערב טוב"):(now.getHours()<12?"Good morning":now.getHours()<17?"Good afternoon":"Good evening");
+
+  const isFS=FULL.includes(nav);
+  const card={background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"16px"};
 
   return(
-    <div style={{fontFamily:"'Outfit',sans-serif",background:"#0f1117",minHeight:"100vh",display:"flex",color:"#e8eaf0",direction:tr.dir}}>
-      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,background:"radial-gradient(ellipse 60% 40% at 20% 10%,rgba(99,102,241,.12) 0%,transparent 60%),radial-gradient(ellipse 50% 50% at 80% 80%,rgba(16,185,129,.08) 0%,transparent 60%)"}}/>
-      {sidebarOpen&&<div onClick={()=>setSB(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:40}}/>}
+    <div style={{fontFamily:"'Outfit',sans-serif",background:"#0f1117",minHeight:"100vh",color:"#e8eaf0",direction:isRTL?"rtl":"ltr",position:"relative"}}>
+      <style>{`
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{margin:0;overflow-x:hidden;}
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        .sidebar{position:fixed;top:0;bottom:0;width:220px;background:rgba(17,19,30,0.97);z-index:50;transition:transform .3s ease;border-left:1px solid rgba(255,255,255,0.06);}
+        .sidebar.rtl{right:0;left:auto;border-left:1px solid rgba(255,255,255,0.06);border-right:none;}
+        .sidebar.ltr{left:0;right:auto;border-right:1px solid rgba(255,255,255,0.06);border-left:none;}
+        @media(min-width:769px){
+          .sidebar.rtl{transform:translateX(0)!important;}
+          .sidebar.ltr{transform:translateX(0)!important;}
+          .main-wrap{margin-right:220px;}
+          .main-wrap.ltr{margin-left:220px;margin-right:0;}
+          .hamburger{display:none!important;}
+        }
+        @media(max-width:768px){
+          .sidebar.rtl.closed{transform:translateX(100%);}
+          .sidebar.ltr.closed{transform:translateX(-100%);}
+          .sidebar.open{transform:translateX(0)!important;}
+          .main-wrap{margin:0!important;}
+          .hamburger{display:flex!important;}
+          .stats-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .widgets-grid{grid-template-columns:1fr!important;}
+          .tasks-stats{grid-template-columns:repeat(3,1fr)!important;}
+        }
+        /* Bottom nav for mobile */
+        .bottom-nav{display:none;}
+        @media(max-width:768px){
+          .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:60;background:rgba(17,19,30,0.97);border-top:1px solid rgba(255,255,255,0.08);padding:6px 0 max(6px,env(safe-area-inset-bottom));justify-content:space-around;}
+          .main-wrap{padding-bottom:70px!important;}
+        }
+        select option{background:#1f2937!important;color:#e8eaf0!important;}
+        select{color:#e8eaf0!important;}
+      `}</style>
+
+      {/* Overlay */}
+      {sb&&<div onClick={()=>setSb(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:40}}/>}
 
       {/* Sidebar */}
-      <aside style={{width:220,background:"rgba(17,19,30,.97)",borderLeft:isRTL?"none":"1px solid rgba(255,255,255,.06)",borderRight:isRTL?"1px solid rgba(255,255,255,.06)":"none",display:"flex",flexDirection:"column",padding:"24px 0",position:"fixed",top:0,bottom:0,[sidebarSide]:0,zIndex:50,transition:"transform .3s ease",transform:sidebarOpen||window.innerWidth>768?"translateX(0)":(isRTL?"translateX(100%)":"translateX(-100%)")}}>
-        <div style={{padding:"0 20px 28px",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+      <aside className={"sidebar "+(isRTL?"rtl":"ltr")+" "+(sb?"open":"closed")} style={{display:"flex",flexDirection:"column",padding:"20px 0"}}>
+        <div style={{padding:"0 16px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#6366f1,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏠</div>
-            <div><div style={{fontWeight:700,fontSize:15}}>{tr.appName}</div><div style={{fontSize:11,color:"#6b7280"}}>{tr.appSub}</div></div>
+            <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#6366f1,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🏠</div>
+            <div><div style={{fontWeight:700,fontSize:14}}>{isRTL?"הבית שלנו":"HomeBase"}</div><div style={{fontSize:10,color:"#6b7280"}}>{isRTL?"לוח משפחתי":"Family Dashboard"}</div></div>
           </div>
         </div>
-        <nav style={{flex:1,padding:"16px 12px",display:"flex",flexDirection:"column",gap:2}}>
-          {NAV_ITEMS.map(item=>{const active=activeNav===item.id;return(
-            <button key={item.id} onClick={()=>{setNav(item.id);setSB(false);}} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,border:"none",background:active?"rgba(99,102,241,.15)":"transparent",color:active?"#a5b4fc":"#6b7280",cursor:"pointer",textAlign:isRTL?"right":"left",width:"100%",fontSize:14,fontWeight:active?600:400,[isRTL?"borderRight":"borderLeft"]:active?"2px solid #6366f1":"2px solid transparent",flexDirection:isRTL?"row-reverse":"row"}}>
-              <span style={{fontSize:16}}>{item.icon}</span>
-              <span style={{flex:1}}>{tr.nav[item.id]}</span>
-              {item.id==="health"&&alerts.length>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:10,fontWeight:700,borderRadius:20,padding:"1px 6px"}}>{alerts.length}</span>}
-              {item.id==="tasks"&&overdueCount>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:10,fontWeight:700,borderRadius:20,padding:"1px 6px"}}>{overdueCount}</span>}
+        <nav style={{flex:1,padding:"12px 10px",display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
+          {NAV.map(item=>{const active=nav===item.id;return(
+            <button key={item.id} onClick={()=>{setNav(item.id);setSb(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,border:"none",background:active?"rgba(99,102,241,0.15)":"transparent",color:active?"#a5b4fc":"#6b7280",cursor:"pointer",width:"100%",fontSize:13,fontWeight:active?600:400,[isRTL?"borderRight":"borderLeft"]:active?"2px solid #6366f1":"2px solid transparent",flexDirection:isRTL?"row-reverse":"row",textAlign:isRTL?"right":"left"}}>
+              <span style={{fontSize:16,flexShrink:0}}>{item.icon}</span>
+              <span style={{flex:1}}>{isRTL?item.he:item.en}</span>
+              {item.id==="health"&&alerts.length>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:10,borderRadius:20,padding:"1px 6px"}}>{alerts.length}</span>}
+              {item.id==="tasks"&&overdue.length>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:10,borderRadius:20,padding:"1px 6px"}}>{overdue.length}</span>}
             </button>
           );})}
         </nav>
-        <div style={{padding:"16px 20px",borderTop:"1px solid rgba(255,255,255,.06)"}}>
-          <div style={{fontSize:11,color:"#4b5563",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>{tr.members}</div>
-          <div style={{display:"flex",gap:8}}>
-            {[{name:"Raz",c:"#6366f1"},{name:"Olga",c:"#06b6d4"},{name:"Kelly",c:"#10b981"}].map(m=>(
-              <div key={m.name} style={{textAlign:"center"}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:m.c+"33",border:"2px solid "+m.c+"66",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:m.c}}>{m.name[0]}</div>
-                <div style={{fontSize:9,color:"#4b5563",marginTop:3}}>{m.name}</div>
+        <div style={{padding:"12px 16px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+          <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+            {[{n:"Raz",c:"#6366f1"},{n:"Olga",c:"#06b6d4"},{n:"K",c:"#10b981"}].map(m=>(
+              <div key={m.n} style={{textAlign:"center"}}>
+                <div style={{width:30,height:30,borderRadius:"50%",background:m.c+"33",border:"2px solid "+m.c+"66",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:m.c}}>{m.n[0]}</div>
+                <div style={{fontSize:9,color:"#4b5563",marginTop:2}}>{m.n}</div>
               </div>
             ))}
           </div>
         </div>
       </aside>
 
-      {/* Main */}
-      <main style={{flex:1,...mainMargin,position:"relative",zIndex:1,minHeight:"100vh"}}>
-        {activeNav==="kelly"     &&<Kelly     lang={lang} onAddTask={handleAddTask}/>}
-        {activeNav==="shopping"  &&<Shopping  lang={lang}/>}
-        {activeNav==="tasks"     &&<Tasks     lang={lang} onNavigate={setNav}/>}
-        {activeNav==="documents" &&<Documents lang={lang}/>}
-        {activeNav==="expenses"  &&<Expenses/>}
+      {/* Main content */}
+      <main className={"main-wrap "+(isRTL?"":"ltr")} style={{minHeight:"100vh"}}>
+        {nav==="kelly"&&<Kelly lang={lang} onAddTask={async t=>await saveDoc(COL.tasks,t.id,t)}/>}
+        {nav==="shopping"&&<Shopping lang={lang}/>}
+        {nav==="tasks"&&<Tasks lang={lang} onNavigate={setNav}/>}
+        {nav==="documents"&&<Documents lang={lang}/>}
+        {nav==="expenses"&&<Expenses/>}
 
         {!isFS&&(
-          <>
-            <header style={{padding:"20px 32px",background:"rgba(15,17,23,.85)",backdropFilter:"blur(10px)",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:20,gap:12}}>
-              <button onClick={()=>setSB(!sidebarOpen)} style={{background:"none",border:"none",color:"#9ca3af",fontSize:22,cursor:"pointer",padding:0,flexShrink:0}}>☰</button>
-              <div style={{flex:1}}>
-                <div style={{fontSize:20,fontWeight:700}}>{tr.greeting(now.getHours())}, {tr.greetingName}</div>
-                <div style={{fontSize:13,color:"#6b7280",marginTop:2}}>{dateStr}</div>
+          <div>
+            {/* Header */}
+            <header style={{padding:"14px 16px",background:"rgba(15,17,23,0.9)",backdropFilter:"blur(10px)",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:20,gap:10}}>
+              <button className="hamburger" onClick={()=>setSb(!sb)} style={{background:"none",border:"none",color:"#9ca3af",fontSize:22,cursor:"pointer",padding:0,flexShrink:0,display:"none"}}>☰</button>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:16,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{greeting}, {isRTL?"רז ואולגה 👋":"Raz & Olga 👋"}</div>
+                <div style={{fontSize:11,color:"#6b7280"}}>{dateStr}</div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                {overdueCount>0&&<div style={{background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.3)",borderRadius:20,padding:"6px 12px",fontSize:12,color:"#fca5a5"}}>⚠ {overdueCount} {tr.overdue}</div>}
-                <button onClick={()=>setLang(lang==="he"?"en":"he")} style={{background:"rgba(99,102,241,.12)",border:"1px solid rgba(99,102,241,.3)",borderRadius:10,padding:"7px 14px",color:"#a5b4fc",fontSize:13,fontWeight:700,cursor:"pointer"}}>{tr.lang}</button>
+              <div style={{display:"flex",gap:8,flexShrink:0}}>
+                {overdue.length>0&&<div style={{background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:20,padding:"4px 10px",fontSize:11,color:"#fca5a5"}}>⚠ {overdue.length}</div>}
+                <button onClick={()=>setLang(lang==="he"?"en":"he")} style={{background:"rgba(99,102,241,0.12)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:8,padding:"5px 10px",color:"#a5b4fc",fontSize:12,fontWeight:700,cursor:"pointer"}}>{isRTL?"EN":"עב"}</button>
               </div>
             </header>
-            <div style={{padding:"28px 32px"}}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:28}} className="stats-grid">
-                {[{l:isRTL?"משימות פתוחות":"Open Tasks",v:openCount+"/"+fbTasks.length,sub:doneCount+" "+( isRTL?"הושלמו":"done"),c:"#6366f1",icon:"✓"},
-                  {l:isRTL?"פריטי קניות":"Shopping Items",v:"12",sub:isRTL?"ברשימה":"in list",c:"#06b6d4",icon:"🛒"},
-                  {l:isRTL?"תקציב חודשי":"Monthly Budget",v:"₪4,200",sub:isRTL?"נותר":"remaining",c:"#10b981",icon:"₪"},
-                  {l:isRTL?"התראות בריאות":"Health Alerts",v:String(alerts.length),sub:isRTL?"דורשות תשומת לב":"need attention",c:"#ef4444",icon:"♥"}
+
+            {/* Dashboard content */}
+            <div style={{padding:"16px"}}>
+              {/* Stats */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}} className="stats-grid">
+                {[
+                  {l:isRTL?"משימות":"Tasks",v:openTasks.length+"/"+tasks.length,sub:doneTasks.length+" "+(isRTL?"הושלמו":"done"),c:"#6366f1",icon:"✓"},
+                  {l:isRTL?"קניות":"Shopping",v:"12",sub:isRTL?"ברשימה":"in list",c:"#06b6d4",icon:"🛒"},
+                  {l:isRTL?"תקציב":"Budget",v:"₪4,200",sub:isRTL?"נותר":"left",c:"#10b981",icon:"₪"},
+                  {l:isRTL?"התראות":"Alerts",v:String(alerts.length),sub:isRTL?"בריאות":"health",c:"#ef4444",icon:"♥"},
                 ].map(s=>(
-                  <div key={s.l} style={{...card,borderTop:"2px solid "+s.c+"44"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                      <div><div style={{fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:1}}>{s.l}</div><div style={{fontSize:26,fontWeight:800,color:s.c,marginTop:4}}>{s.v}</div><div style={{fontSize:12,color:"#4b5563",marginTop:2}}>{s.sub}</div></div>
-                      <div style={{width:36,height:36,borderRadius:10,background:s.c+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>{s.icon}</div>
-                    </div>
+                  <div key={s.l} style={{...card,textAlign:"center",borderTop:"2px solid "+s.c+"44"}}>
+                    <div style={{fontSize:18,marginBottom:2}}>{s.icon}</div>
+                    <div style={{fontSize:9,color:"#6b7280"}}>{s.l}</div>
+                    <div style={{fontSize:18,fontWeight:800,color:s.c,margin:"2px 0"}}>{s.v}</div>
+                    <div style={{fontSize:9,color:"#4b5563"}}>{s.sub}</div>
                   </div>
                 ))}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}} className="widgets-grid">
-                {/* Tasks widget - synced with Firebase */}
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}} className="widgets-grid">
+                {/* Tasks widget */}
                 <div style={card}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                    <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>{isRTL?"משימות דחופות":"Urgent Tasks"}</h2><div style={{fontSize:12,color:"#6b7280",marginTop:3}}>{isRTL?"לפי עדיפות ותאריך":"By priority & date"}</div></div>
-                    <button onClick={()=>setNav("tasks")} style={{background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.2)",borderRadius:8,padding:"5px 10px",color:"#a5b4fc",fontSize:11,cursor:"pointer"}}>{tr.viewAll} →</button>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                    <div><div style={{fontSize:15,fontWeight:700}}>{isRTL?"משימות דחופות":"Urgent Tasks"}</div><div style={{fontSize:11,color:"#6b7280"}}>{isRTL?"לפי עדיפות":"By priority"}</div></div>
+                    <button onClick={()=>setNav("tasks")} style={{background:"rgba(99,102,241,0.1)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:8,padding:"4px 10px",color:"#a5b4fc",fontSize:11,cursor:"pointer"}}>{isRTL?"הכל →":"All →"}</button>
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {dashTasks.length===0?(<div style={{textAlign:"center",padding:20,color:"#6b7280",fontSize:14}}>🎉 {isRTL?"אין משימות פתוחות":"No open tasks"}</div>):
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {dashTasks.length===0?(<div style={{textAlign:"center",padding:16,color:"#6b7280",fontSize:13}}>🎉 {isRTL?"אין משימות פתוחות":"No open tasks"}</div>):
                     dashTasks.map(task=>{
-                      const daysLeft=task.dueDate?Math.ceil((new Date(task.dueDate)-new Date(today))/86400000):null;
-                      const isOverdue=daysLeft!==null&&daysLeft<0;
-                      const isToday=daysLeft===0;
+                      const dl=task.dueDate?Math.ceil((new Date(task.dueDate)-new Date(today))/86400000):null;
+                      const isOv=dl!==null&&dl<0,isT=dl===0;
                       return(
-                        <div key={task.id} onClick={()=>toggleTask(task)} style={{display:"flex",alignItems:"center",flexDirection:isRTL?"row-reverse":"row",gap:12,padding:"11px 14px",borderRadius:12,cursor:"pointer",background:isOverdue?"rgba(239,68,68,0.06)":isToday?"rgba(245,158,11,0.06)":"rgba(255,255,255,.03)",border:isOverdue?"1px solid rgba(239,68,68,0.2)":isToday?"1px solid rgba(245,158,11,0.2)":"1px solid rgba(255,255,255,.05)"}}>
-                          <div style={{width:20,height:20,borderRadius:6,flexShrink:0,background:"transparent",border:"2px solid rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}></div>
-                          <div style={{flex:1,fontSize:14,fontWeight:500,color:"#e8eaf0",textAlign:isRTL?"right":"left"}}>{isRTL?task.he:(task.en||task.he)}</div>
-                          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                            {task.priority==="high"&&<span style={{fontSize:10,padding:"2px 7px",borderRadius:20,background:"rgba(239,68,68,0.15)",color:"#fca5a5"}}>{tr.urgent}</span>}
-                            {isOverdue&&<span style={{fontSize:10,color:"#ef4444",fontWeight:700}}>{Math.abs(daysLeft)}d {tr.overdue}</span>}
-                            {isToday&&<span style={{fontSize:10,color:"#f59e0b",fontWeight:700}}>{tr.today2}!</span>}
-                            {daysLeft!==null&&!isOverdue&&!isToday&&<span style={{fontSize:10,color:"#6b7280"}}>{daysLeft}d</span>}
+                        <div key={task.id} style={{display:"flex",alignItems:"center",flexDirection:isRTL?"row-reverse":"row",gap:10,padding:"9px 12px",borderRadius:10,background:isOv?"rgba(239,68,68,0.06)":isT?"rgba(245,158,11,0.06)":"rgba(255,255,255,0.03)",border:isOv?"1px solid rgba(239,68,68,0.2)":isT?"1px solid rgba(245,158,11,0.2)":"1px solid rgba(255,255,255,0.05)"}}>
+                          <div style={{width:18,height:18,borderRadius:5,flexShrink:0,border:"2px solid rgba(255,255,255,0.15)"}}/>
+                          <div style={{flex:1,fontSize:13,fontWeight:500,color:"#e8eaf0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{isRTL?task.he:(task.en||task.he)}</div>
+                          <div style={{display:"flex",gap:4,flexShrink:0}}>
+                            {task.priority==="high"&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:20,background:"rgba(239,68,68,0.15)",color:"#fca5a5"}}>{isRTL?"דחוף":"High"}</span>}
+                            {isOv&&<span style={{fontSize:9,color:"#ef4444",fontWeight:700}}>{Math.abs(dl)}d</span>}
+                            {isT&&<span style={{fontSize:9,color:"#f59e0b",fontWeight:700}}>{isRTL?"היום":"Today"}</span>}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <button onClick={()=>setNav("tasks")} style={{width:"100%",marginTop:14,padding:"10px",background:"rgba(99,102,241,.08)",border:"1px dashed rgba(99,102,241,.3)",borderRadius:10,color:"#a5b4fc",fontSize:13,cursor:"pointer"}}>{tr.addTask}</button>
+                  <button onClick={()=>setNav("tasks")} style={{width:"100%",marginTop:12,padding:"8px",background:"rgba(99,102,241,0.08)",border:"1px dashed rgba(99,102,241,0.3)",borderRadius:10,color:"#a5b4fc",fontSize:12,cursor:"pointer"}}>+ {isRTL?"הוסף משימה":"Add task"}</button>
                 </div>
 
-                <div style={{display:"flex",flexDirection:"column",gap:20}}>
-                  {/* Shopping widget */}
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                  {/* Quick add */}
                   <div style={card}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                      <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>{tr.quickAdd}</h2><div style={{fontSize:12,color:"#6b7280",marginTop:3}}>{tr.frequent}</div></div>
-                      <button onClick={()=>setNav("shopping")} style={{background:"rgba(6,182,212,.1)",border:"1px solid rgba(6,182,212,.2)",borderRadius:8,padding:"6px 12px",color:"#67e8f9",fontSize:12,cursor:"pointer"}}>{tr.viewList}</button>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <div style={{fontSize:15,fontWeight:700}}>{isRTL?"הוספה מהירה":"Quick Add"}</div>
+                      <button onClick={()=>setNav("shopping")} style={{background:"rgba(6,182,212,0.1)",border:"1px solid rgba(6,182,212,0.2)",borderRadius:8,padding:"4px 10px",color:"#67e8f9",fontSize:11,cursor:"pointer"}}>{isRTL?"לרשימה":"List"}</button>
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
-                      {tr.items.map((name,i)=>(<button key={i} onClick={()=>addCart(i)} style={{background:added[i]?"rgba(16,185,129,.15)":"rgba(255,255,255,.04)",border:added[i]?"1px solid rgba(16,185,129,.3)":"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:"12px 6px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}><span style={{fontSize:22}}>{added[i]?"✓":ICONS[i]}</span><span style={{fontSize:10,color:added[i]?"#6ee7b7":"#9ca3af"}}>{name}</span></button>))}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+                      {(isRTL?["חלב","לחם","ביצים","קפה","בננות"]:["Milk","Bread","Eggs","Coffee","Bananas"]).map((name,i)=>(<button key={i} onClick={()=>{setAdded(p=>({...p,[i]:true}));setTimeout(()=>setAdded(p=>({...p,[i]:false})),1500);}} style={{background:added[i]?"rgba(16,185,129,0.15)":"rgba(255,255,255,0.04)",border:added[i]?"1px solid rgba(16,185,129,0.3)":"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 4px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><span style={{fontSize:18}}>{added[i]?"✓":ICONS[i]}</span><span style={{fontSize:9,color:added[i]?"#6ee7b7":"#9ca3af"}}>{name}</span></button>))}
                     </div>
                   </div>
-                  {/* Health widget */}
-                  <div style={{...card,flex:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                      <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>{tr.health}</h2><div style={{fontSize:12,color:"#6b7280",marginTop:3}}>{tr.meds}</div></div>
-                      {alerts.length>0&&<div style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#fca5a5"}}>⚠ {alerts.length} {tr.refill}</div>}
+                  {/* Health */}
+                  <div style={card}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <div style={{fontSize:15,fontWeight:700}}>{isRTL?"בריאות":"Health"}</div>
+                      {alerts.length>0&&<div style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,padding:"3px 8px",fontSize:10,color:"#fca5a5"}}>⚠ {alerts.length}</div>}
                     </div>
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {HEALTH.map(item=>{const urgent=item.daysLeft!==undefined&&item.daysLeft<=7;return(
-                        <div key={item.id} style={{display:"flex",alignItems:"center",flexDirection:isRTL?"row-reverse":"row",gap:12,padding:"11px 14px",borderRadius:12,background:urgent?"rgba(239,68,68,.06)":"rgba(255,255,255,.03)",border:urgent?"1px solid rgba(239,68,68,.2)":"1px solid rgba(255,255,255,.05)"}}>
-                          <div style={{width:34,height:34,borderRadius:10,flexShrink:0,background:item.type==="medication"?(urgent?"rgba(239,68,68,.15)":"rgba(99,102,241,.12)"):"rgba(16,185,129,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>{item.type==="medication"?"💊":item.type==="treatment"?"🩺":"📅"}</div>
-                          <div style={{flex:1,textAlign:isRTL?"right":"left"}}><div style={{fontSize:13,fontWeight:600}}>{item[lang]||item.he}</div><div style={{fontSize:11,color:"#6b7280"}}>{item.person}</div></div>
-                          <div style={{textAlign:isRTL?"left":"right",flexShrink:0}}>{item.daysLeft!==undefined?(<><div style={{fontSize:13,fontWeight:700,color:urgent?"#ef4444":"#9ca3af"}}>{tr.daysLeft(item.daysLeft)}</div>{urgent&&<div style={{fontSize:10,color:"#ef4444"}}>{tr.soon}</div>}</>):(<div style={{fontSize:12,color:"#9ca3af"}}>{tr.due} {item.dueDate}</div>)}</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {HEALTH.map(item=>{const u=item.daysLeft!==undefined&&item.daysLeft<=7;return(
+                        <div key={item.id} style={{display:"flex",alignItems:"center",flexDirection:isRTL?"row-reverse":"row",gap:10,padding:"9px 12px",borderRadius:10,background:u?"rgba(239,68,68,0.06)":"rgba(255,255,255,0.03)",border:u?"1px solid rgba(239,68,68,0.2)":"1px solid rgba(255,255,255,0.05)"}}>
+                          <div style={{width:30,height:30,borderRadius:8,flexShrink:0,background:item.type==="medication"?(u?"rgba(239,68,68,0.15)":"rgba(99,102,241,0.12)"):"rgba(16,185,129,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>{item.type==="medication"?"💊":item.type==="treatment"?"🩺":"📅"}</div>
+                          <div style={{flex:1,textAlign:isRTL?"right":"left"}}><div style={{fontSize:12,fontWeight:600}}>{item[lang]||item.he}</div><div style={{fontSize:10,color:"#6b7280"}}>{item.person}</div></div>
+                          <div style={{textAlign:"center",flexShrink:0}}>{item.daysLeft!==undefined?<div style={{fontSize:12,fontWeight:700,color:u?"#ef4444":"#9ca3af"}}>{item.daysLeft}d</div>:<div style={{fontSize:10,color:"#9ca3af"}}>{item.dueDate}</div>}</div>
                         </div>
                       );})}
                     </div>
@@ -218,15 +219,28 @@ export default function App(){
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Hamburger button - always visible on full screen pages */}
-        {isFS&&(
-          <button onClick={()=>setSB(!sidebarOpen)} style={{position:"fixed",top:16,[isRTL?"left":"right"]:16,zIndex:60,background:"rgba(17,19,30,0.9)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:42,height:42,display:"flex",alignItems:"center",justifyContent:"center",color:"#e8eaf0",fontSize:20,cursor:"pointer"}}>☰</button>
-        )}
+        {/* Hamburger — always visible */}
+        <button className="hamburger" onClick={()=>setSb(!sb)} style={{position:"fixed",top:14,[isRTL?"left":"right"]:14,zIndex:60,background:"rgba(17,19,30,0.9)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:40,height:40,display:"none",alignItems:"center",justifyContent:"center",color:"#e8eaf0",fontSize:20,cursor:"pointer"}}>☰</button>
       </main>
-      <style>{"@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;}body{margin:0;}@media(max-width:900px){.widgets-grid{grid-template-columns:1fr!important;}}@media(max-width:768px){.main-content{margin-left:0!important;margin-right:0!important;}.stats-grid{grid-template-columns:repeat(2,1fr)!important;}}"}</style>
+
+      {/* Bottom navigation — mobile only */}
+      <nav className="bottom-nav">
+        {NAV.slice(0,5).map(item=>(
+          <button key={item.id} onClick={()=>setNav(item.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 8px",background:"none",border:"none",color:nav===item.id?"#a5b4fc":"#6b7280",cursor:"pointer",flex:1,fontSize:10,fontWeight:nav===item.id?700:400,position:"relative"}}>
+            <span style={{fontSize:20}}>{item.icon}</span>
+            <span>{isRTL?item.he:item.en}</span>
+            {nav===item.id&&<div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:24,height:2,background:"#6366f1",borderRadius:2}}/>}
+            {item.id==="tasks"&&overdue.length>0&&<div style={{position:"absolute",top:2,right:6,width:8,height:8,background:"#ef4444",borderRadius:"50%"}}/>}
+          </button>
+        ))}
+        <button onClick={()=>setSb(!sb)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 8px",background:"none",border:"none",color:"#6b7280",cursor:"pointer",flex:1,fontSize:10}}>
+          <span style={{fontSize:20}}>☰</span>
+          <span>{isRTL?"עוד":"More"}</span>
+        </button>
+      </nav>
     </div>
   );
-  }
+                                  }
