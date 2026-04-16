@@ -25,7 +25,8 @@ const S = {
 
 let UID=500; const nid=()=>"doc"+String(++UID)+Date.now();
 
-export default function Documents({ lang }) {
+export default function Documents({ lang, theme }) {
+  const TH = theme || {bg:"#0f1117", card:"rgba(255,255,255,0.03)", cardBorder:"rgba(255,255,255,0.08)", text:"#e8eaf0", subText:"#6b7280", mutedText:"#4b5563", input:"rgba(255,255,255,0.05)", inputBorder:"rgba(255,255,255,0.12)"};
   const [docs,     setDocs]     = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [filterC,  setFilterC]  = useState("all");
