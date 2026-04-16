@@ -15,7 +15,8 @@ const ST = {
 let UID=300; const nid=()=>"k"+String(++UID)+Date.now();
 const mf0={date:"",type:"בדיקה",visitDesc:"",treatment:"",treatFreq:1,treatWeeks:1,treatDays:[],treatNote:"",vet:""};
 
-export default function Kelly({lang,onAddTask}){
+export default function Kelly({lang, onAddTask, theme}) {
+  const TH = theme || {bg:"#0f1117"};
   const [sec,setSec]=useState("weight");
   const [loading,setLoading]=useState(true);
   const [weights,setWeights]=useState([]);
