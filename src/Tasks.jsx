@@ -28,7 +28,6 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
     inp:{background:TH.input,border:"1px solid "+TH.inputBorder,borderRadius:10,padding:"9px 12px",color:TH.text,fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"},
     btn:{background:"linear-gradient(135deg,#6366f1,#06b6d4)",border:"none",borderRadius:10,padding:"9px 16px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"},
   };
-
   const [tasks,setTasks]=useState([]);
   const [loading,setLoading]=useState(true);
   const [showForm,setShowForm]=useState(false);
@@ -49,17 +48,15 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
 
   useEffect(()=>{const u=listenCol(COL.tasks,d=>{setTasks(d);setLoading(false);});return()=>u();},[]);
 
-  // Load subs and notes for open task
   useEffect(()=>{
     if(!openTask)return;
     const u1=listenCol("subs_"+openTask,s=>setSubs(p=>({...p,[openTask]:s.sort((a,b)=>(a._o||0)-(b._o||0))})));
-    const u2=listenCol("notes_"+openTask,n=>setNotes(p=>({...p,[openTask]:n.sort((a,b)=>a._o-b._o)})));
+    const u2=listenCol("notes_"+openTask,n=>setNotes(p=>({...p,[openTask]:n.sort((a,b)=>(a._o||0)-(b._o||0))})));
     return()=>{u1();u2();};
   },[openTask]);
 
   const ov=useMemo(()=>tasks.filter(t=>!t.done&&du(t.dueDate)!==null&&du(t.dueDate)<0),[tasks]);
   const dc=tasks.filter(t=>t.done).length;
-
   const fil=useMemo(()=>tasks.filter(t=>{
     if(!showDone&&t.done)return false;
     if(fv==="pending"&&t.done)return false;
@@ -69,17 +66,12 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
     if(fp!=="all"&&t.person!==fp&&t.person!=="Both")return false;
     if(fc!=="all"&&t.cat!==fc)return false;
     return true;
-  }).sort((a,b)=>{
-    const p={high:0,medium:1,low:2};
-    if(p[a.priority]!==p[b.priority])return p[a.priority]-p[b.priority];
-    return(a.dueDate||"9")>(b.dueDate||"9")?1:-1;
-  }),[tasks,fv,fp,fc,showDone]);
+  }).sort((a,b)=>{const p={high:0,medium:1,low:2};if(p[a.priority]!==p[b.priority])return p[a.priority]-p[b.priority];return(a.dueDate||"9")>(b.dueDate||"9")?1:-1;}),[tasks,fv,fp,fc,showDone]);
 
-  const markDone=async(t,auto)=>{
+  const markDone=async(t)=>{
     const n=t.recur!=="none"?nd(tod(),t.recur):t.dueDate;
     await saveDoc(COL.tasks,t.id,{done:t.recur==="none",lastDone:tod(),dueDate:t.recur!=="none"?n:t.dueDate});
-    if(t.recur==="none"){setConfetti(true);setTimeout(()=>setConfetti(false),2500);}
-    if(auto)setOpenTask(null);
+    if(t.recur==="none"){setConfetti(true);setTimeout(()=>setConfetti(false),2500);setOpenTask(null);}
   };
   const del=async(id)=>{deleteDocById(COL.tasks,id);if(openTask===id)setOpenTask(null);};
   const save=async()=>{
@@ -88,94 +80,53 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
     await saveDoc(COL.tasks,id,{...form,id,en:form.he,done:false,lastDone:editId?(tasks.find(t=>t.id===editId)?.lastDone||""):""});
     setShowForm(false);setEditId(null);setForm(ef);
   };
-  const edit2=(t)=>{setForm({...t,description:t.description||""});setEditId(t.id);setShowForm(true);setDrop(null);};
-
-  // Subtasks
-  const addSub=async(tid)=>{
-    const txt=(subTxt[tid]||"").trim();if(!txt)return;
-    const id="s"+Date.now();
-    await saveDoc("subs_"+tid,id,{id,text:txt,done:false,_o:Date.now()});
-    setSubTxt(p=>({...p,[tid]:""}));
-  };
+  const edit2=(t)=>{setForm({...t,description:t.description||""});setEditId(t.id);setShowForm(true);setOpenTask(null);};
+  const addSub=async(tid)=>{const txt=(subTxt[tid]||"").trim();if(!txt)return;const id="s"+Date.now();await saveDoc("subs_"+tid,id,{id,text:txt,done:false,_o:Date.now()});setSubTxt(p=>({...p,[tid]:""}));};
   const togSub=async(tid,s,allSubs,task)=>{
-    const newDone=!s.done;
-    await saveDoc("subs_"+tid,s.id,{done:newDone});
-    const updatedSubs=allSubs.map(x=>x.id===s.id?{...x,done:newDone}:x);
-    if(updatedSubs.length>0&&updatedSubs.every(x=>x.done)){
-      await markDone(task,true);
-    }
+    const nd2=!s.done;
+    await saveDoc("subs_"+tid,s.id,{done:nd2});
+    const updated=allSubs.map(x=>x.id===s.id?{...x,done:nd2}:x);
+    if(updated.length>0&&updated.every(x=>x.done))markDone(task);
   };
   const delSub=async(tid,sid)=>deleteDocById("subs_"+tid,sid);
   const getSubs=(tid)=>subs[tid]||[];
-
-  // Notes
-  const addNote=async(tid)=>{
-    const txt=(noteTxt[tid]||"").trim();if(!txt)return;
-    const id="n"+Date.now();
-    const now=new Date().toISOString();
-    await saveDoc("notes_"+tid,id,{id,text:txt,date:now,_o:Date.now()});
-    setNoteTxt(p=>({...p,[tid]:""}));
-  };
+  const addNote=async(tid)=>{const txt=(noteTxt[tid]||"").trim();if(!txt)return;const id="n"+Date.now();await saveDoc("notes_"+tid,id,{id,text:txt,date:new Date().toISOString(),_o:Date.now()});setNoteTxt(p=>({...p,[tid]:""}));};
   const delNote=async(tid,nid2)=>deleteDocById("notes_"+tid,nid2);
   const getNotes=(tid)=>notes[tid]||[];
-
-  // Description autosave
   const saveDesc=async(tid,val)=>saveDoc(COL.tasks,tid,{description:val});
 
-  const DD=({id,value,opts,onChange})=>{
-    const open=drop===id;
-    const cur=opts.find(o=>o.v===value)||opts[0];
-    return(
-      <div style={{position:"relative"}}>
-        <button onClick={e=>{e.stopPropagation();setDrop(open?null:id);}} style={{background:TH.input,border:"1px solid "+TH.cardBorder,borderRadius:20,padding:"5px 12px",color:TH.text,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{cur.l}<span style={{fontSize:9}}>▼</span></button>
-        {open&&(<div style={{position:"absolute",top:"110%",[isRTL?"right":"left"]:0,background:TH.bg==="#f1f5f9"?"#fff":"#1e2130",border:"1px solid "+TH.cardBorder,borderRadius:10,padding:4,zIndex:100,minWidth:130,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>{opts.map(o=>(<button key={o.v} onClick={()=>{onChange(o.v);setDrop(null);}} style={{display:"block",width:"100%",padding:"7px 12px",background:value===o.v?"rgba(99,102,241,0.15)":"transparent",border:"none",borderRadius:7,color:value===o.v?"#a5b4fc":TH.text,fontSize:12,cursor:"pointer",textAlign:isRTL?"right":"left"}}>{o.l}</button>))}</div>)}
-      </div>
-    );
-  };
+  const DD=({id,value,opts,onChange})=>{const open=drop===id;const cur=opts.find(o=>o.v===value)||opts[0];return(<div style={{position:"relative"}}><button onClick={e=>{e.stopPropagation();setDrop(open?null:id);}} style={{background:TH.input,border:"1px solid "+TH.cardBorder,borderRadius:20,padding:"5px 12px",color:TH.text,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{cur.l}<span style={{fontSize:9}}>▼</span></button>{open&&(<div style={{position:"absolute",top:"110%",[isRTL?"right":"left"]:0,background:TH.bg==="#f1f5f9"?"#fff":"#1e2130",border:"1px solid "+TH.cardBorder,borderRadius:10,padding:4,zIndex:100,minWidth:130,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>{opts.map(o=>(<button key={o.v} onClick={()=>{onChange(o.v);setDrop(null);}} style={{display:"block",width:"100%",padding:"7px 12px",background:value===o.v?"rgba(99,102,241,0.15)":"transparent",border:"none",borderRadius:7,color:value===o.v?"#a5b4fc":TH.text,fontSize:12,cursor:"pointer",textAlign:isRTL?"right":"left"}}>{o.l}</button>))}</div>)}</div>);};
 
   if(loading)return(<div style={{fontFamily:"'Outfit',sans-serif",color:TH.text,background:TH.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",gap:12}}><div style={{width:28,height:28,border:"3px solid rgba(99,102,241,0.3)",borderTop:"3px solid #6366f1",borderRadius:"50%",animation:"sp 1s linear infinite"}}/>טוען...<style>{"@keyframes sp{to{transform:rotate(360deg)}}"}</style></div>);
 
   return(
     <div style={{fontFamily:"'Outfit',sans-serif",color:TH.text,direction:isRTL?"rtl":"ltr",minHeight:"100vh",background:TH.bg,transition:"background .3s,color .3s"}} onClick={()=>drop&&setDrop(null)}>
       <Confetti show={confetti}/>
-
-      {/* Header */}
       <div style={{background:TH.bg==="#f1f5f9"?"rgba(255,255,255,0.95)":"rgba(17,19,30,0.95)",borderBottom:"1px solid "+TH.cardBorder,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,position:"sticky",top:0,zIndex:30}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#6366f1,#a855f7)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>✓</div>
-          <div>
-            <div style={{fontSize:16,fontWeight:800,color:TH.text}}>{isRTL?"משימות":"Tasks"}</div>
-            {ov.length>0?<div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>⚠ {ov.length} {isRTL?"באיחור":"overdue"}</div>:<div style={{fontSize:11,color:"#10b981"}}>🔥 {isRTL?"מסונכרן":"Synced"}</div>}
-          </div>
+          <div><div style={{fontSize:16,fontWeight:800,color:TH.text}}>{isRTL?"משימות":"Tasks"}</div>{ov.length>0?<div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>⚠ {ov.length} {isRTL?"באיחור":"overdue"}</div>:<div style={{fontSize:11,color:"#10b981"}}>🔥 {isRTL?"מסונכרן":"Synced"}</div>}</div>
         </div>
-        <button onClick={e=>{e.stopPropagation();setForm(ef);setEditId(null);setShowForm(!showForm);}} style={{...C.btn,display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontSize:18,fontWeight:300}}>{showForm?"✕":"+"}</span>
-          {showForm?(isRTL?"סגור":"Close"):(isRTL?"משימה":"Task")}
-        </button>
+        <button onClick={e=>{e.stopPropagation();setForm(ef);setEditId(null);setShowForm(!showForm);}} style={{...C.btn,display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:18,fontWeight:300}}>{showForm?"✕":"+"}</span>{showForm?(isRTL?"סגור":"Close"):(isRTL?"משימה":"Task")}</button>
       </div>
 
       <div style={{padding:"12px 14px",maxWidth:700,margin:"0 auto"}}>
-
-        {/* Add/Edit Form */}
-        {showForm&&(
-          <div style={{...C.card,marginBottom:14,borderColor:"rgba(99,102,241,0.35)"}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:13,fontWeight:700,color:"#a5b4fc",marginBottom:12}}>{editId?(isRTL?"עריכה":"Edit"):(isRTL?"משימה חדשה":"New Task")}</div>
-            <input value={form.he} onChange={e=>setForm(f=>({...f,he:e.target.value}))} placeholder={isRTL?"שם המשימה...":"Task name..."} style={{...C.inp,fontSize:15,fontWeight:500,marginBottom:8}} autoFocus/>
-            <textarea value={form.description||""} onChange={e=>setForm(f=>({...f,description:e.target.value}))} onKeyDown={e=>e.stopPropagation()} placeholder={isRTL?"תיאור המשימה (אופציונלי)...":"Description (optional)..."} style={{...C.inp,minHeight:60,resize:"vertical",marginBottom:8}}/>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-              <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"קטגוריה":"Category"}</div><select value={form.cat} onChange={e=>setForm(f=>({...f,cat:e.target.value}))} style={{...C.inp,appearance:"none"}}>{CATS.map(c=><option key={c.id} value={c.id} style={{background:TH.bg,color:TH.text}}>{c.icon} {isRTL?c.he:c.en}</option>)}</select></div>
-              <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"עדיפות":"Priority"}</div><select value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))} style={{...C.inp,appearance:"none"}}>{["high","medium","low"].map(p=><option key={p} value={p} style={{background:TH.bg,color:TH.text}}>{PL[lang][p]}</option>)}</select></div>
-              <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"תאריך":"Due date"}</div><input type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))} style={C.inp}/></div>
-              <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"אחראי":"Assignee"}</div><select value={form.person} onChange={e=>setForm(f=>({...f,person:e.target.value}))} style={{...C.inp,appearance:"none"}}>{["Raz","Olga",isRTL?"שניהם":"Both"].map(p=><option key={p} style={{background:TH.bg,color:TH.text}}>{p}</option>)}</select></div>
-              <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"תדירות":"Frequency"}</div><select value={form.recur} onChange={e=>setForm(f=>({...f,recur:e.target.value}))} style={{...C.inp,appearance:"none"}}>{RECUR.map(r=><option key={r.id} value={r.id} style={{background:TH.bg,color:TH.text}}>{isRTL?r.he:r.en}</option>)}</select></div>
-              <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"הערה קצרה":"Short note"}</div><input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} onKeyDown={e=>e.stopPropagation()} style={C.inp}/></div>
-            </div>
-            <div style={{display:"flex",gap:8}}><button onClick={save} style={C.btn}>{isRTL?"שמור":"Save"}</button><button onClick={()=>{setShowForm(false);setEditId(null);}} style={{...C.btn,background:TH.input,color:TH.subText}}>{isRTL?"ביטול":"Cancel"}</button></div>
-            <style>{"select option{background:"+TH.bg+"!important;color:"+TH.text+"!important;}"}</style>
+        {showForm&&(<div style={{...C.card,marginBottom:14,borderColor:"rgba(99,102,241,0.35)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:13,fontWeight:700,color:"#a5b4fc",marginBottom:12}}>{editId?(isRTL?"עריכה":"Edit"):(isRTL?"משימה חדשה":"New Task")}</div>
+          <input value={form.he} onChange={e=>setForm(f=>({...f,he:e.target.value}))} placeholder={isRTL?"שם המשימה...":"Task name..."} style={{...C.inp,fontSize:15,fontWeight:500,marginBottom:8}} autoFocus/>
+          <textarea value={form.description||""} onChange={e=>setForm(f=>({...f,description:e.target.value}))} onKeyDown={e=>e.stopPropagation()} placeholder={isRTL?"תיאור...":"Description..."} style={{...C.inp,minHeight:55,resize:"vertical",marginBottom:8}}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"קטגוריה":"Category"}</div><select value={form.cat} onChange={e=>setForm(f=>({...f,cat:e.target.value}))} style={{...C.inp,appearance:"none"}}>{CATS.map(c=><option key={c.id} value={c.id} style={{background:TH.bg,color:TH.text}}>{c.icon} {isRTL?c.he:c.en}</option>)}</select></div>
+            <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"עדיפות":"Priority"}</div><select value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))} style={{...C.inp,appearance:"none"}}>{["high","medium","low"].map(p=><option key={p} value={p} style={{background:TH.bg,color:TH.text}}>{PL[lang][p]}</option>)}</select></div>
+            <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"תאריך":"Due date"}</div><input type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))} style={C.inp}/></div>
+            <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"אחראי":"Assignee"}</div><select value={form.person} onChange={e=>setForm(f=>({...f,person:e.target.value}))} style={{...C.inp,appearance:"none"}}>{["Raz","Olga",isRTL?"שניהם":"Both"].map(p=><option key={p} style={{background:TH.bg,color:TH.text}}>{p}</option>)}</select></div>
+            <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"תדירות":"Frequency"}</div><select value={form.recur} onChange={e=>setForm(f=>({...f,recur:e.target.value}))} style={{...C.inp,appearance:"none"}}>{RECUR.map(r=><option key={r.id} value={r.id} style={{background:TH.bg,color:TH.text}}>{isRTL?r.he:r.en}</option>)}</select></div>
+            <div><div style={{fontSize:10,color:TH.subText,marginBottom:3}}>{isRTL?"הערה קצרה":"Note"}</div><input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} onKeyDown={e=>e.stopPropagation()} style={C.inp}/></div>
           </div>
-        )}
+          <div style={{display:"flex",gap:8}}><button onClick={save} style={C.btn}>{isRTL?"שמור":"Save"}</button><button onClick={()=>{setShowForm(false);setEditId(null);}} style={{...C.btn,background:TH.input,color:TH.subText}}>{isRTL?"ביטול":"Cancel"}</button></div>
+          <style>{"select option{background:"+TH.bg+"!important;color:"+TH.text+"!important;}"}</style>
+        </div>)}
 
-        {/* Filters */}
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}} onClick={e=>e.stopPropagation()}>
           <DD id="v" value={fv} opts={[{v:"pending",l:isRTL?"ממתינות":"Pending"},{v:"overdue",l:(isRTL?"באיחור":"Overdue")+(ov.length>0?" ("+ov.length+")":"")},{v:"recurring",l:isRTL?"מחזוריות":"Recurring"},{v:"done",l:isRTL?"הושלמו":"Done"}]} onChange={setFv}/>
           <DD id="p" value={fp} opts={[{v:"all",l:isRTL?"כולם":"All"},{v:"Raz",l:"Raz"},{v:"Olga",l:"Olga"}]} onChange={setFp}/>
@@ -183,7 +134,6 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
           {dc>0&&(<button onClick={()=>setShowDone(!showDone)} style={{background:showDone?"rgba(16,185,129,0.15)":TH.input,border:showDone?"1px solid rgba(16,185,129,0.3)":"1px solid "+TH.cardBorder,borderRadius:20,padding:"5px 12px",color:showDone?"#6ee7b7":TH.subText,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>{showDone?(isRTL?"הסתר":"Hide"):(isRTL?"הושלמו":"Done")} ({dc})</button>)}
         </div>
 
-        {/* Tasks list */}
         {fil.length===0?<div style={{...C.card,textAlign:"center",padding:40,color:TH.subText}}><div style={{fontSize:32,marginBottom:8}}>🎉</div>{isRTL?"אין משימות":"No tasks"}</div>
         :fil.map(t=>{
           const d=du(t.dueDate),cat=ci(t.cat),isOv=d!==null&&d<0;
@@ -195,14 +145,9 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
           const isOpen=openTask===t.id;
           const pct=tS>0?Math.round((dS/tS)*100):0;
           const ns=getNotes(t.id);
-
           return(
             <div key={t.id} style={{marginBottom:10}}>
-              {/* Task row — click to open */}
-              <div
-                onClick={()=>setOpenTask(isOpen?null:t.id)}
-                style={{display:"flex",alignItems:"center",gap:10,padding:"13px 16px",borderRadius:isOpen?"14px 14px 0 0":"12px",background:t.done?"rgba(16,185,129,0.04)":isOv?"rgba(239,68,68,0.05)":TH.rowBg,border:t.done?"1px solid rgba(16,185,129,0.12)":isOv?"1px solid rgba(239,68,68,0.2)":"1px solid "+TH.cardBorder,[isRTL?"borderRight":"borderLeft"]:"3px solid "+(t.done?"transparent":PC[t.priority]||"#6b7280"),flexDirection:isRTL?"row-reverse":"row",borderBottom:isOpen?"none":"",cursor:"pointer"}}
-              >
+              <div onClick={()=>setOpenTask(isOpen?null:t.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"13px 16px",borderRadius:isOpen?"14px 14px 0 0":"12px",background:t.done?"rgba(16,185,129,0.04)":isOv?"rgba(239,68,68,0.05)":TH.rowBg,border:t.done?"1px solid rgba(16,185,129,0.12)":isOv?"1px solid rgba(239,68,68,0.2)":"1px solid "+TH.cardBorder,[isRTL?"borderRight":"borderLeft"]:"3px solid "+(t.done?"transparent":PC[t.priority]||"#6b7280"),flexDirection:isRTL?"row-reverse":"row",borderBottom:isOpen?"none":"",cursor:"pointer"}}>
                 <div onClick={e=>{e.stopPropagation();!t.done&&markDone(t);}} style={{width:22,height:22,borderRadius:7,flexShrink:0,background:t.done?"#10b981":"transparent",border:t.done?"2px solid #10b981":"2px solid "+TH.mutedText,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#fff",cursor:t.done?"default":"pointer"}}>{t.done?"✓":""}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexDirection:isRTL?"row-reverse":"row"}}>
@@ -218,83 +163,65 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
                     {ns.length>0&&<span style={{fontSize:10,color:TH.mutedText}}>📝 {ns.length}</span>}
                   </div>
                 </div>
-                <span style={{fontSize:11,color:TH.subText,flexShrink:0,transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                <span style={{fontSize:11,color:TH.subText,flexShrink:0,transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0)"}}>▼</span>
               </div>
 
-              {/* Detail Panel */}
               {isOpen&&(
-                <div style={{background:TH.bg==="#f1f5f9"?"#fff":"rgba(15,17,30,0.98)",border:"1px solid rgba(99,102,241,0.25)",borderTop:"none",borderRadius:"0 0 14px 14px",overflow:"hidden"}}>
-
-                  {/* Panel Header */}
-                  <div style={{padding:"14px 18px 10px",borderBottom:"1px solid "+TH.cardBorder,background:"rgba(99,102,241,0.06)"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexDirection:isRTL?"row-reverse":"row",marginBottom:6}}>
-                      <span style={{fontSize:22}}>{cat.icon}</span>
-                      <div>
+                <div style={{background:TH.bg==="#f1f5f9"?"#fff":"rgba(15,17,30,0.98)",border:"1px solid rgba(99,102,241,0.25)",borderTop:"none",borderRadius:"0 0 14px 14px"}}>
+                  <div style={{padding:"14px 18px 12px",borderBottom:"1px solid "+TH.cardBorder,background:"rgba(99,102,241,0.05)"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,flexDirection:isRTL?"row-reverse":"row",marginBottom:8}}>
+                      <span style={{fontSize:24}}>{cat.icon}</span>
+                      <div style={{flex:1}}>
                         <div style={{fontSize:16,fontWeight:800,color:TH.text}}>{t.he}</div>
-                        <div style={{fontSize:11,color:TH.subText}}>{isRTL?cat.he:cat.en} · {PL[lang][t.priority]} · {pl}{t.dueDate?" · "+t.dueDate:""}</div>
+                        <div style={{fontSize:11,color:TH.subText,marginTop:2}}>{isRTL?cat.he:cat.en} · {PL[lang][t.priority]} · {pl}{t.dueDate?" · "+t.dueDate:""}</div>
                       </div>
                     </div>
-
-                    {/* Description */}
-                    <textarea
-                      defaultValue={t.description||""}
-                      onBlur={e=>saveDesc(t.id,e.target.value)}
-                      onKeyDown={e=>e.stopPropagation()}
-                      placeholder={isRTL?"תיאור המשימה...":"Task description..."}
-                      style={{...C.inp,minHeight:55,resize:"vertical",fontSize:13,marginTop:4}}
-                    />
+                    <textarea defaultValue={t.description||""} onBlur={e=>saveDesc(t.id,e.target.value)} onKeyDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} placeholder={isRTL?"תיאור המשימה...":"Task description..."} style={{...C.inp,minHeight:60,resize:"vertical",fontSize:13}}/>
                   </div>
 
-                  {/* Subtasks */}
                   <div style={{padding:"12px 18px",borderBottom:"1px solid "+TH.cardBorder}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                       <div style={{fontSize:13,fontWeight:700,color:TH.text}}>{isRTL?"תת-משימות":"Subtasks"}</div>
-                      {tS>0&&<span style={{fontSize:13,fontWeight:800,color:dS===tS?"#10b981":"#a5b4fc"}}>{dS}/{tS}</span>}
+                      {tS>0&&<span style={{fontSize:14,fontWeight:800,color:dS===tS?"#10b981":"#a5b4fc"}}>{dS}/{tS}</span>}
                     </div>
-                    {tS>0&&(
-                      <div style={{height:5,background:TH.input,borderRadius:3,marginBottom:10}}>
-                        <div style={{height:"100%",background:dS===tS?"linear-gradient(to right,#10b981,#059669)":"linear-gradient(to right,#6366f1,#06b6d4)",borderRadius:3,width:pct+"%",transition:"width .3s"}}/>
-                      </div>
-                    )}
-                    {ss.length===0&&<div style={{fontSize:12,color:TH.mutedText,padding:"4px 0 8px",textAlign:"center"}}>{isRTL?"הוסף תת-משימות למטה":"Add subtasks below"}</div>}
+                    {tS>0&&(<div style={{height:5,background:TH.input,borderRadius:3,marginBottom:10}}><div style={{height:"100%",background:dS===tS?"linear-gradient(to right,#10b981,#059669)":"linear-gradient(to right,#6366f1,#06b6d4)",borderRadius:3,width:pct+"%",transition:"width .3s"}}/></div>)}
+                    {ss.length===0&&<div style={{fontSize:12,color:TH.mutedText,textAlign:"center",padding:"4px 0 8px"}}>{isRTL?"אין תת-משימות עדיין":"No subtasks yet"}</div>}
                     {ss.map(s=>(
                       <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid "+TH.cardBorder,flexDirection:isRTL?"row-reverse":"row"}}>
-                        <div onClick={()=>togSub(t.id,s,ss,t)} style={{width:20,height:20,borderRadius:6,flexShrink:0,background:s.done?"#10b981":"transparent",border:s.done?"2px solid #10b981":"2px solid "+TH.mutedText,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",cursor:"pointer"}}>{s.done?"✓":""}</div>
+                        <div onClick={e=>{e.stopPropagation();togSub(t.id,s,ss,t);}} style={{width:20,height:20,borderRadius:6,flexShrink:0,background:s.done?"#10b981":"transparent",border:s.done?"2px solid #10b981":"2px solid "+TH.mutedText,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",cursor:"pointer"}}>{s.done?"✓":""}</div>
                         <span style={{flex:1,fontSize:13,color:s.done?TH.mutedText:TH.text,textDecoration:s.done?"line-through":"none"}}>{s.text}</span>
-                        <button onClick={()=>delSub(t.id,s.id)} style={{background:"none",border:"none",color:TH.mutedText,cursor:"pointer",fontSize:14,padding:"0 2px",opacity:0.6}}>✕</button>
+                        <button onClick={e=>{e.stopPropagation();delSub(t.id,s.id);}} style={{background:"none",border:"none",color:TH.mutedText,cursor:"pointer",fontSize:14,padding:"0 2px",opacity:0.6}}>✕</button>
                       </div>
                     ))}
-                    <div style={{display:"flex",gap:6,marginTop:8,flexDirection:isRTL?"row-reverse":"row"}}>
+                    <div style={{display:"flex",gap:6,marginTop:8,flexDirection:isRTL?"row-reverse":"row"}} onClick={e=>e.stopPropagation()}>
                       <input value={subTxt[t.id]||""} onChange={e=>setSubTxt(p=>({...p,[t.id]:e.target.value}))} onKeyDown={e=>{e.stopPropagation();if(e.key==="Enter")addSub(t.id);}} placeholder={isRTL?"הוסף תת-משימה...":"Add subtask..."} style={{...C.inp,fontSize:13,padding:"7px 12px",flex:1}}/>
-                      <button onClick={()=>addSub(t.id)} style={{...C.btn,padding:"7px 14px",fontSize:13,flexShrink:0}}>+</button>
+                      <button onClick={e=>{e.stopPropagation();addSub(t.id);}} style={{...C.btn,padding:"7px 14px",fontSize:13,flexShrink:0}}>+</button>
                     </div>
                   </div>
 
-                  {/* Notes log */}
                   <div style={{padding:"12px 18px",borderBottom:"1px solid "+TH.cardBorder}}>
                     <div style={{fontSize:13,fontWeight:700,color:TH.text,marginBottom:10}}>📝 {isRTL?"יומן הערות":"Notes Log"}</div>
                     {ns.length===0&&<div style={{fontSize:12,color:TH.mutedText,textAlign:"center",padding:"4px 0 8px"}}>{isRTL?"אין הערות עדיין":"No notes yet"}</div>}
-                    <div style={{maxHeight:180,overflowY:"auto",marginBottom:8}}>
+                    <div style={{maxHeight:200,overflowY:"auto",marginBottom:8}}>
                       {ns.map(n=>(
                         <div key={n.id} style={{padding:"8px 10px",borderRadius:8,background:TH.input,marginBottom:6,border:"1px solid "+TH.cardBorder}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                            <span style={{fontSize:10,color:TH.subText,fontWeight:600}}>{fmtDate(n.date)}</span>
-                            <button onClick={()=>delNote(t.id,n.id)} style={{background:"none",border:"none",color:TH.mutedText,cursor:"pointer",fontSize:12,padding:"0 2px",opacity:0.6}}>✕</button>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                            <span style={{fontSize:10,color:"#a5b4fc",fontWeight:600}}>{fmtDate(n.date)}</span>
+                            <button onClick={e=>{e.stopPropagation();delNote(t.id,n.id);}} style={{background:"none",border:"none",color:TH.mutedText,cursor:"pointer",fontSize:12,padding:0,opacity:0.6}}>✕</button>
                           </div>
                           <div style={{fontSize:13,color:TH.text,lineHeight:1.5}}>{n.text}</div>
                         </div>
                       ))}
                     </div>
-                    <div style={{display:"flex",gap:6,flexDirection:isRTL?"row-reverse":"row"}}>
+                    <div style={{display:"flex",gap:6,flexDirection:isRTL?"row-reverse":"row"}} onClick={e=>e.stopPropagation()}>
                       <input value={noteTxt[t.id]||""} onChange={e=>setNoteTxt(p=>({...p,[t.id]:e.target.value}))} onKeyDown={e=>{e.stopPropagation();if(e.key==="Enter")addNote(t.id);}} placeholder={isRTL?"הוסף הערה...":"Add note..."} style={{...C.inp,fontSize:13,padding:"7px 12px",flex:1}}/>
-                      <button onClick={()=>addNote(t.id)} style={{...C.btn,padding:"7px 14px",fontSize:12,flexShrink:0,whiteSpace:"nowrap"}}>{isRTL?"הוסף":"Add"}</button>
+                      <button onClick={e=>{e.stopPropagation();addNote(t.id);}} style={{...C.btn,padding:"7px 14px",fontSize:12,flexShrink:0}}>{isRTL?"הוסף":"Add"}</button>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div style={{padding:"10px 18px",display:"flex",gap:7,flexDirection:isRTL?"row-reverse":"row",flexWrap:"wrap"}}>
+                  <div style={{padding:"10px 18px",display:"flex",gap:7,flexWrap:"wrap",flexDirection:isRTL?"row-reverse":"row"}} onClick={e=>e.stopPropagation()}>
                     {!t.done&&<button onClick={()=>markDone(t)} style={{...C.btn,background:"linear-gradient(135deg,#10b981,#059669)",padding:"7px 14px",fontSize:12}}>✓ {isRTL?"סמן כבוצע":"Mark done"}</button>}
-                    <button onClick={e=>{e.stopPropagation();edit2(t);setOpenTask(null);}} style={{background:"rgba(99,102,241,0.12)",border:"1px solid rgba(99,102,241,0.25)",borderRadius:9,padding:"7px 14px",color:"#a5b4fc",fontSize:12,cursor:"pointer"}}>✏️ {isRTL?"ערוך":"Edit"}</button>
+                    <button onClick={()=>edit2(t)} style={{background:"rgba(99,102,241,0.12)",border:"1px solid rgba(99,102,241,0.25)",borderRadius:9,padding:"7px 14px",color:"#a5b4fc",fontSize:12,cursor:"pointer"}}>✏️ {isRTL?"ערוך":"Edit"}</button>
                     <button onClick={()=>del(t.id)} style={{background:"rgba(239,68,68,0.09)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:9,padding:"7px 14px",color:"#fca5a5",fontSize:12,cursor:"pointer"}}>🗑 {isRTL?"מחק":"Delete"}</button>
                     {t.dueDate&&onAddToCalendar&&<button onClick={()=>onAddToCalendar(t)} style={{background:"rgba(66,133,244,0.12)",border:"1px solid rgba(66,133,244,0.25)",borderRadius:9,padding:"7px 14px",color:"#93c5fd",fontSize:12,cursor:"pointer"}}>📅 {isRTL?"ליומן":"Calendar"}</button>}
                   </div>
@@ -306,4 +233,4 @@ export default function Tasks({lang,onNavigate,onAddToCalendar,theme}){
       </div>
     </div>
   );
-             }
+                                                     }
